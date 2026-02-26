@@ -1,4 +1,4 @@
-import { Play, Star, Clock, MoreVertical, Trash2, Edit, FolderOpen } from "lucide-react";
+import { Play, Star, Clock, MoreVertical, Trash2, Edit, FolderOpen, Save } from "lucide-react";
 import type { Game } from "@/types/game";
 import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
@@ -112,6 +112,25 @@ export function GameCard({ game, onEdit, onDelete, onClick }: Props) {
                 }}
               >
                 <FolderOpen className="w-3.5 h-3.5" /> 打开目录
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-4 transition-colors"
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (game.save_path) {
+                    invoke("open_folder", { path: game.save_path });
+                  } else {
+                    try {
+                      const dirs = await invoke<string[]>("find_save_directories", { installPath: game.install_path });
+                      invoke("open_folder", { path: dirs.length > 0 ? dirs[0] : game.install_path });
+                    } catch {
+                      invoke("open_folder", { path: game.install_path });
+                    }
+                  }
+                  setMenuOpen(false);
+                }}
+              >
+                <Save className="w-3.5 h-3.5" /> 打开存档
               </button>
               <hr className="border-surface-4 my-1" />
               <button
