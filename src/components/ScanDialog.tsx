@@ -573,7 +573,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
                           <p className="text-[10px] text-text-muted mt-1">
                             {activeItem.vndb.id}
                             {activeItem.vndb.released && ` · ${activeItem.vndb.released}`}
-                            {activeItem.vndb.rating && ` · ★${(activeItem.vndb.rating / 10).toFixed(1)}`}
+                            {activeItem.vndb.rating && ` · ★${(activeItem.vndb.rating / 10).toFixed(2)}`}
                           </p>
                           {activeItem.vndb.developers?.length > 0 && (
                             <p className="text-[10px] text-text-muted">
@@ -663,7 +663,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
                               {vn.rating && (
                                 <span className="text-[9px] text-accent flex items-center gap-0.5">
                                   <Star className="w-2 h-2" fill="currentColor" />
-                                  {(vn.rating / 10).toFixed(1)}
+                                  {(vn.rating / 10).toFixed(2)}
                                 </span>
                               )}
                             </div>

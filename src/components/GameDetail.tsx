@@ -26,7 +26,7 @@ export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
     await invoke("open_folder", { path: game.install_path });
   };
 
-  const vndbScore = game.vndb_rating > 0 ? (game.vndb_rating / 10).toFixed(1) : null;
+  const vndbScore = game.vndb_rating > 0 ? (game.vndb_rating / 10).toFixed(2) : null;
   const vndbUrl = game.vndb_id ? `https://vndb.org/${game.vndb_id}` : null;
 
   return (
@@ -104,6 +104,15 @@ export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
                 <span className="text-text-primary">{game.engine}</span>
               </div>
             )}
+            {vndbScore && (
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted">评分</span>
+                <span className="text-accent flex items-center gap-1">
+                  <Star className="w-3 h-3" fill="currentColor" />
+                  {vndbScore}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-text-muted">游玩时间</span>
               <span className="text-text-primary flex items-center gap-1">
@@ -113,23 +122,6 @@ export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
                   : "暂无记录"}
               </span>
             </div>
-          </div>
-
-          {/* VNDB Rating */}
-          <div className="mt-4">
-            <span className="text-xs text-text-muted block mb-1">VNDB 评分</span>
-            {vndbScore ? (
-              <div className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-yellow-400" fill="currentColor" />
-                <span className="text-xl font-bold text-text-primary">{vndbScore}</span>
-                <span className="text-xs text-text-muted">/ 10</span>
-                {game.vndb_id && (
-                  <span className="text-[10px] text-text-muted ml-auto">via VNDB</span>
-                )}
-              </div>
-            ) : (
-              <span className="text-sm text-text-muted">暂无评分</span>
-            )}
           </div>
           
           {/* VNDB Link */}

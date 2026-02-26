@@ -161,14 +161,17 @@ export function GameCard({ game, onEdit, onDelete, onClick }: Props) {
         <div className="flex items-center justify-between mt-2">
           {game.vndb_rating > 0 ? (
             <div className="flex items-center gap-1">
-              <Star className="w-3 h-3 text-yellow-400" fill="currentColor" />
-              <span className="text-xs font-medium text-text-primary">
-                {(game.vndb_rating / 10).toFixed(2)}
+              <span className="text-accent flex items-center gap-1">
+                <Star className="w-3 h-3" fill="currentColor" />
+                <span className="text-xs font-medium text-text-primary">
+                  {(game.vndb_rating / 10).toFixed(2)}
+                </span>
               </span>
             </div>
           ) : (
             <span className="text-[10px] text-text-muted">暂无评分</span>
           )}
+
           {game.total_playtime > 0 && (
             <span className="text-[10px] text-text-muted flex items-center gap-1">
               <Clock className="w-2.5 h-2.5" />

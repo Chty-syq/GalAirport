@@ -304,7 +304,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                         {vn.rating && (
                           <span className="text-[10px] text-accent flex items-center gap-0.5">
                             <Star className="w-2.5 h-2.5" fill="currentColor" />
-                            {(vn.rating / 10).toFixed(1)}
+                            {(vn.rating / 10).toFixed(2)}
                           </span>
                         )}
                       </div>
