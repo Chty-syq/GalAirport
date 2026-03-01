@@ -8,19 +8,13 @@ interface Props {
   game: Game;
   onClose: () => void;
   onEdit: (game: Game) => void;
+  onLaunch: (game: Game) => void;
+  isRunning: boolean;
   onVndbMatch?: (game: Game) => void;
 }
 
-export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
+export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbMatch }: Props) {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
-
-  const handleLaunch = async () => {
-    try {
-      await invoke("launch_game", { exePath: game.exe_path });
-    } catch (err) {
-      console.error("Failed to launch:", err);
-    }
-  };
 
   const openFolder = async () => {
     await invoke("open_folder", { path: game.install_path });
@@ -240,10 +234,20 @@ export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
               <FolderOpen className="w-4 h-4" /> 打开目录
             </button>
             <button
-              onClick={handleLaunch}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 hover:bg-surface-4 text-text-primary rounded-lg text-sm transition-colors"
+              onClick={() => !isRunning && onLaunch(game)}
+              disabled={isRunning}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 hover:bg-surface-4 disabled:opacity-50 text-text-primary rounded-lg text-sm transition-colors"
             >
-              <Play className="w-4 h-4" fill="currentColor" /> 启动游戏
+              {isRunning ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  运行中
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" fill="currentColor" /> 启动游戏
+                </>
+              )}
             </button>
             <button
               onClick={() => onEdit(game)}

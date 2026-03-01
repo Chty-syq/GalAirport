@@ -217,6 +217,27 @@ export async function searchGames(query: string): Promise<Game[]> {
   return rows.map(rowToGame);
 }
 
+// ─── Play Sessions ──────────────────────────────────────────
+
+export async function addPlaySession(
+  gameId: string,
+  startTime: string,
+  endTime: string,
+  duration: number
+): Promise<void> {
+  const d = await getDb();
+  const id = crypto.randomUUID();
+  await d.execute(
+    `INSERT INTO play_sessions (id, game_id, start_time, end_time, duration)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [id, gameId, startTime, endTime, duration]
+  );
+  await d.execute(
+    `UPDATE games SET total_playtime = total_playtime + $1, updated_at = $2 WHERE id = $3`,
+    [duration, new Date().toISOString(), gameId]
+  );
+}
+
 // ─── Settings ───────────────────────────────────────────────
 
 export async function getSetting(key: string): Promise<string> {

@@ -3,15 +3,19 @@ import type { Game } from "@/types/game";
 import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useToast } from "@/components/Toast";
 
 interface Props {
   game: Game;
   onEdit: (game: Game) => void;
   onDelete: (id: string) => void;
   onClick: (game: Game) => void;
+  onLaunch: (game: Game) => void;
+  isRunning: boolean;
 }
 
-export function GameCard({ game, onEdit, onDelete, onClick }: Props) {
+export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning }: Props) {
+  const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -25,13 +29,14 @@ export function GameCard({ game, onEdit, onDelete, onClick }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleLaunch = async (e: React.MouseEvent) => {
+  const handleLaunch = (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      await invoke("launch_game", { exePath: game.exe_path });
-    } catch (err) {
-      console.error("Failed to launch:", err);
+    if (isRunning) return;
+    if (!game.exe_path) {
+      toast("error", `「${game.title}」未设置可执行文件路径`);
+      return;
     }
+    onLaunch(game);
   };
 
   return (
@@ -59,25 +64,34 @@ export function GameCard({ game, onEdit, onDelete, onClick }: Props) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {/* Play button overlay */}
-        <button
-          onClick={handleLaunch}
-          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        >
-          <div className="w-14 h-14 rounded-full bg-accent/90 flex items-center justify-center shadow-lg backdrop-blur-sm hover:bg-accent transition-colors">
-            <Play className="w-6 h-6 text-white ml-0.5" fill="currentColor" />
-          </div>
-        </button>
+        {!isRunning && (
+          <button
+            onClick={handleLaunch}
+            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          >
+            <div className="w-14 h-14 rounded-full bg-accent/90 flex items-center justify-center shadow-lg backdrop-blur-sm hover:bg-accent transition-colors">
+              <Play className="w-6 h-6 text-white ml-0.5" fill="currentColor" />
+            </div>
+          </button>
+        )}
 
         {/* Status badge */}
-        <div className="absolute top-2.5 left-2.5">
-          <span
-            className={cn(
-              "px-2 py-0.5 rounded-full text-[11px] font-medium text-white/90 backdrop-blur-sm",
-              statusColor(game.play_status)
-            )}
-          >
-            {statusLabel(game.play_status)}
-          </span>
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
+          {isRunning ? (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-white bg-green-600/90 backdrop-blur-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+              运行中
+            </span>
+          ) : (
+            <span
+              className={cn(
+                "px-2 py-0.5 rounded-full text-[11px] font-medium text-white/90 backdrop-blur-sm",
+                statusColor(game.play_status)
+              )}
+            >
+              {statusLabel(game.play_status)}
+            </span>
+          )}
         </div>
 
         {/* Context menu */}

@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Gamepad2 } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import type { Game, GameFormData, ViewMode } from "@/types/game";
 import { useGameLibrary } from "@/hooks/useGameLibrary";
+import * as db from "@/lib/database";
 import { Sidebar } from "@/components/Sidebar";
 import { Toolbar } from "@/components/Toolbar";
 import { GameCard } from "@/components/GameCard";
@@ -22,6 +25,35 @@ function App() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [vndbMatchGame, setVndbMatchGame] = useState<Game | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [runningGameId, setRunningGameId] = useState<string | null>(null);
+
+  // Listen for playtime session ended events from Rust
+  useEffect(() => {
+    const unlisten = listen<{
+      game_id: string;
+      start_time: string;
+      end_time: string;
+      duration: number;
+    }>("playtime_session_ended", async (event) => {
+      const { game_id, start_time, end_time, duration } = event.payload;
+      if (duration > 0) {
+        await db.addPlaySession(game_id, start_time, end_time, duration);
+        await library.refresh();
+      }
+      setRunningGameId(null);
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  const handleLaunchGame = useCallback(async (game: Game) => {
+    if (runningGameId) return;
+    try {
+      await invoke("launch_game", { exePath: game.exe_path, gameId: game.id });
+      setRunningGameId(game.id);
+    } catch (err) {
+      console.error("Failed to launch game:", err);
+    }
+  }, [runningGameId]);
 
   const handleAddGame = () => {
     setEditingGame(null);
@@ -127,6 +159,8 @@ function App() {
                     onEdit={handleEditGame}
                     onDelete={handleDeleteGame}
                     onClick={setSelectedGame}
+                    onLaunch={handleLaunchGame}
+                    isRunning={runningGameId === game.id}
                   />
                 ))}
               </div>
@@ -139,6 +173,8 @@ function App() {
                     onEdit={handleEditGame}
                     onDelete={handleDeleteGame}
                     onClick={setSelectedGame}
+                    onLaunch={handleLaunchGame}
+                    isRunning={runningGameId === game.id}
                   />
                 ))}
               </div>
@@ -164,6 +200,8 @@ function App() {
           game={selectedGame}
           onClose={() => setSelectedGame(null)}
           onEdit={handleEditGame}
+          onLaunch={handleLaunchGame}
+          isRunning={runningGameId === selectedGame.id}
           onVndbMatch={(game) => {
             setSelectedGame(null);
             setVndbMatchGame(game);
