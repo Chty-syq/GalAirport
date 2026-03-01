@@ -44,6 +44,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   // Auto-search on mount
   useEffect(() => {
@@ -70,13 +71,14 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
   };
 
   const selectVn = async (vn: VndbVn) => {
+    // Show partial data immediately — no freezing
+    setSelectedVn(vn);
     setLoadingDetail(true);
     try {
-      // Fetch full detail with developers
       const detail = await getVnById(vn.id);
-      setSelectedVn(detail || vn);
+      if (detail) setSelectedVn(detail);
     } catch {
-      setSelectedVn(vn); // Fallback to search result
+      // Keep partial data already displayed
     } finally {
       setLoadingDetail(false);
     }
@@ -169,6 +171,8 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
         screenshots: screenshotPaths.length > 0 ? screenshotPaths : game.screenshots,
         tags: mergedTags,
         vndb_rating: selectedVn.rating || 0,
+        vndb_votecount: selectedVn.votecount || 0,
+        length_minutes: selectedVn.length_minutes || 0,
         notes: translatedNotes,
       };
 
@@ -321,11 +325,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
 
           {/* Right: detail preview */}
           <div className="w-1/2 overflow-y-auto">
-            {loadingDetail ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 text-accent animate-spin" />
-              </div>
-            ) : selectedVn ? (
+            {selectedVn ? (
               <div className="p-4 space-y-4">
                 {/* Cover preview */}
                 {selectedVn.image?.url && (
@@ -348,7 +348,6 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                       {pickOriginalTitle(selectedVn)}
                     </p>
                   )}
-                  {/* Show romanized title if display is Chinese */}
                   {pickDisplayTitle(selectedVn) !== selectedVn.title && (
                     <p className="text-xs text-text-muted/70 mt-0.5">
                       {selectedVn.title}
@@ -373,35 +372,41 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
 
                 {/* Metadata table */}
                 <div className="space-y-1.5 text-xs">
-                  {selectedVn.developers && selectedVn.developers.length > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-text-muted">开发商</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-text-muted">开发商</span>
+                    {loadingDetail ? (
+                      <Loader2 className="w-3 h-3 text-accent animate-spin" />
+                    ) : selectedVn.developers && selectedVn.developers.length > 0 ? (
                       <span className="text-text-primary text-right">
                         {selectedVn.developers.map((d) => d.name).join(", ")}
                       </span>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-text-muted/50">—</span>
+                    )}
+                  </div>
                   {selectedVn.released && selectedVn.released !== "TBA" && (
                     <div className="flex justify-between">
                       <span className="text-text-muted">发售日</span>
                       <span className="text-text-primary">{selectedVn.released}</span>
                     </div>
                   )}
-                  {selectedVn.rating && (
+                  {selectedVn.rating != null && selectedVn.rating > 0 && (
                     <div className="flex justify-between items-center">
                       <span className="text-text-muted">VNDB 评分</span>
                       <span className="text-accent flex items-center gap-1">
                         <Star className="w-3 h-3" fill="currentColor" />
-                        {(selectedVn.rating / 10).toFixed(2)} ({selectedVn.votecount} 票)
+                        {(selectedVn.rating / 10).toFixed(2)}
+                        <span className="text-text-muted">({selectedVn.votecount} 票)</span>
                       </span>
                     </div>
                   )}
-                  {selectedVn.length_minutes && (
+                  {selectedVn.length_minutes != null && selectedVn.length_minutes > 0 && (
                     <div className="flex justify-between items-center">
                       <span className="text-text-muted">平均游玩时长</span>
                       <span className="text-text-primary flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {Math.round(selectedVn.length_minutes / 60)}h{selectedVn.length_minutes % 60}m
+                        {Math.round(selectedVn.length_minutes / 60)}h
+                        {selectedVn.length_minutes % 60 > 0 && `${selectedVn.length_minutes % 60}m`}
                       </span>
                     </div>
                   )}
@@ -443,9 +448,34 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                 {selectedVn.description && (
                   <div>
                     <span className="text-xs text-text-muted mb-1 block">简介</span>
-                    <p className="text-xs text-text-secondary leading-relaxed line-clamp-6">
+                    <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
                       {cleanDescription(selectedVn.description)}
                     </p>
+                  </div>
+                )}
+
+                {/* VNDB Screenshots */}
+                {selectedVn.screenshots && selectedVn.screenshots.filter((s) => s.sexual < 1 && s.violence < 1).length > 0 && (
+                  <div>
+                    <span className="text-xs text-text-muted block mb-2">截图预览</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {selectedVn.screenshots
+                        .filter((s) => s.sexual < 1 && s.violence < 1)
+                        .slice(0, 4)
+                        .map((ss) => (
+                          <div
+                            key={ss.id}
+                            className="rounded-lg overflow-hidden bg-surface-2 aspect-video cursor-pointer"
+                            onClick={() => setLightboxImg(ss.url)}
+                          >
+                            <img
+                              src={ss.url}
+                              alt=""
+                              className="w-full h-full object-cover hover:opacity-80 transition-opacity"
+                            />
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 )}
 
@@ -461,6 +491,9 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                     )}
                     {selectedVn.released && <p>✓ 发售日期</p>}
                     {selectedVn.image?.url && <p>✓ 封面图片（自动下载）</p>}
+                    {selectedVn.screenshots?.filter((s) => s.sexual < 1 && s.violence < 1).length > 0 && (
+                      <p>✓ 截图（自动下载，最多 4 张）</p>
+                    )}
                     {selectedVn.tags?.length > 0 && <p>✓ 标签（合并）</p>}
                     {!game.notes && selectedVn.description && (
                       <p>✓ 备注（VNDB 简介）</p>
@@ -476,6 +509,27 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
             )}
           </div>
         </div>
+
+        {/* Screenshot Lightbox */}
+        {lightboxImg && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer rounded-2xl"
+            onClick={() => setLightboxImg(null)}
+          >
+            <img
+              src={lightboxImg}
+              alt="截图放大"
+              className="max-w-[90%] max-h-[85%] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightboxImg(null)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex justify-between items-center px-6 py-4 border-t border-surface-3">

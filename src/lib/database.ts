@@ -50,6 +50,12 @@ async function initSchema() {
   if (!cols.has("vndb_rating")) {
     await d.execute("ALTER TABLE games ADD COLUMN vndb_rating INTEGER NOT NULL DEFAULT 0");
   }
+  if (!cols.has("vndb_votecount")) {
+    await d.execute("ALTER TABLE games ADD COLUMN vndb_votecount INTEGER NOT NULL DEFAULT 0");
+  }
+  if (!cols.has("length_minutes")) {
+    await d.execute("ALTER TABLE games ADD COLUMN length_minutes INTEGER NOT NULL DEFAULT 0");
+  }
 
   await d.execute(`
     CREATE TABLE IF NOT EXISTS play_sessions (
@@ -100,6 +106,8 @@ function rowToGame(row: Record<string, unknown>): Game {
     play_status: row.play_status as Game["play_status"],
     rating: row.rating as number,
     vndb_rating: (row.vndb_rating as number) || 0,
+    vndb_votecount: (row.vndb_votecount as number) || 0,
+    length_minutes: (row.length_minutes as number) || 0,
     notes: row.notes as string,
     engine: row.engine as string,
     total_playtime: row.total_playtime as number,
@@ -131,8 +139,8 @@ export async function addGame(data: GameFormData): Promise<Game> {
   const now = new Date().toISOString();
 
   await d.execute(
-    `INSERT INTO games (id, title, title_original, vndb_id, developer, release_date, exe_path, install_path, save_path, cover_path, screenshots, tags, play_status, rating, vndb_rating, notes, engine, total_playtime, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 0, $18, $18)`,
+    `INSERT INTO games (id, title, title_original, vndb_id, developer, release_date, exe_path, install_path, save_path, cover_path, screenshots, tags, play_status, rating, vndb_rating, vndb_votecount, length_minutes, notes, engine, total_playtime, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, 0, $20, $20)`,
     [
       id,
       data.title,
@@ -149,6 +157,8 @@ export async function addGame(data: GameFormData): Promise<Game> {
       data.play_status,
       data.rating,
       data.vndb_rating || 0,
+      data.vndb_votecount || 0,
+      data.length_minutes || 0,
       data.notes,
       data.engine,
       now,

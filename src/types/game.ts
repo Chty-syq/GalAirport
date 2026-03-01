@@ -16,6 +16,8 @@ export interface Game {
   play_status: PlayStatus;
   rating: number;              // user rating 0-10
   vndb_rating: number;         // VNDB rating 0-100
+  vndb_votecount: number;      // VNDB vote count
+  length_minutes: number;      // average playtime in minutes from VNDB
   notes: string;               // translated description
   engine: string;
   total_playtime: number;      // seconds
@@ -45,6 +47,8 @@ export interface GameFormData {
   play_status: PlayStatus;
   rating: number;
   vndb_rating: number;
+  vndb_votecount: number;
+  length_minutes: number;
   notes: string;
   engine: string;
 }

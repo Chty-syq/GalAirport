@@ -57,9 +57,7 @@ function App() {
   };
 
   const handleScanImport = async (games: GameFormData[]) => {
-    for (const game of games) {
-      await library.addGame(game);
-    }
+    await library.addGames(games);
     setShowScan(false);
   };
 

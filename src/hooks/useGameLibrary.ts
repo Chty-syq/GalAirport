@@ -37,6 +37,16 @@ export function useGameLibrary() {
     [loadGames]
   );
 
+  const addGames = useCallback(
+    async (dataList: GameFormData[]) => {
+      for (const data of dataList) {
+        await db.addGame(data);
+      }
+      await loadGames();
+    },
+    [loadGames]
+  );
+
   const updateGame = useCallback(
     async (id: string, data: Partial<GameFormData>) => {
       await db.updateGame(id, data);
@@ -112,6 +122,7 @@ export function useGameLibrary() {
     sortDirection,
     setSortDirection,
     addGame,
+    addGames,
     updateGame,
     deleteGame,
     refresh: loadGames,
