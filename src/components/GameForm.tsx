@@ -282,38 +282,6 @@ export function GameForm({ game, onSave, onClose }: Props) {
             </div>
           </div>
 
-          {/* Rating */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1.5">
-              评分: {form.rating}/10
-            </label>
-            <div className="flex gap-1">
-              {Array.from({ length: 10 }, (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => set("rating", i + 1)}
-                  className="transition-transform hover:scale-110"
-                >
-                  <Star
-                    className={cn(
-                      "w-5 h-5",
-                      i < form.rating ? "text-yellow-400" : "text-surface-4"
-                    )}
-                    fill={i < form.rating ? "currentColor" : "none"}
-                  />
-                </button>
-              ))}
-              {form.rating > 0 && (
-                <button
-                  onClick={() => set("rating", 0)}
-                  className="ml-2 text-xs text-text-muted hover:text-text-secondary"
-                >
-                  清除
-                </button>
-              )}
-            </div>
-          </div>
-
           {/* Tags */}
           <div>
             <label className="block text-xs text-text-muted mb-1.5">标签</label>
@@ -368,12 +336,12 @@ export function GameForm({ game, onSave, onClose }: Props) {
 
           {/* Notes */}
           <div>
-            <label className="block text-xs text-text-muted mb-1.5">备注</label>
+            <label className="block text-xs text-text-muted mb-1.5">简介</label>
             <textarea
               value={form.notes}
               onChange={(e) => set("notes", e.target.value)}
               rows={3}
-              placeholder="个人笔记、攻略要点等..."
+              placeholder="游戏简介..."
               className="w-full px-3 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent transition-colors resize-none"
             />
           </div>

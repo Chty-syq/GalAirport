@@ -207,6 +207,12 @@ export async function deleteGame(id: string): Promise<void> {
   await d.execute("DELETE FROM games WHERE id = $1", [id]);
 }
 
+export async function getExistingInstallPaths(): Promise<Set<string>> {
+  const d = await getDb();
+  const rows = await d.select<Record<string, unknown>[]>("SELECT install_path FROM games");
+  return new Set(rows.map((r) => r.install_path as string).filter(Boolean));
+}
+
 export async function searchGames(query: string): Promise<Game[]> {
   const d = await getDb();
   const pattern = `%${query}%`;

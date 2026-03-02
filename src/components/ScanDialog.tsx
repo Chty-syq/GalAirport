@@ -74,9 +74,19 @@ export function ScanDialog({ onImport, onClose }: Props) {
     const paths: string[] = Array.isArray(result) ? result : [result];
     const detected = await invoke<DetectedGame[]>("scan_games", { paths });
 
-    const existingPaths = new Set(items.map((i) => i.detected.install_path));
+    const sessionPaths = new Set(items.map((i) => i.detected.install_path));
+    const dbPaths = await db.getExistingInstallPaths();
+
+    let skippedCount = 0;
     const newItems: ImportItem[] = detected
-      .filter((g) => !existingPaths.has(g.install_path))
+      .filter((g) => {
+        if (sessionPaths.has(g.install_path)) return false;
+        if (dbPaths.has(g.install_path)) {
+          skippedCount++;
+          return false;
+        }
+        return true;
+      })
       .map((g) => ({
         detected: g,
         vndb: null,
@@ -87,6 +97,10 @@ export function ScanDialog({ onImport, onClose }: Props) {
         translatedTags: [],
         status: "pending" as const,
       }));
+
+    if (skippedCount > 0) {
+      toast("warning", `已跳过 ${skippedCount} 个已导入的游戏`);
+    }
 
     setItems((prev) => [...prev, ...newItems]);
   };
