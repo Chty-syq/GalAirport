@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import type { Game, GameFormData, PlayStatus, SortField, SortDirection } from "@/types/game";
+import type { Collection, Game, GameFormData, PlayStatus, SortField, SortDirection } from "@/types/game";
 import * as db from "@/lib/database";
 
 export function useGameLibrary() {
@@ -8,16 +8,20 @@ export function useGameLibrary() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<PlayStatus | "all">("all");
   const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterCollection, setFilterCollection] = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [collections, setCollections] = useState<Collection[]>([]);
 
   const loadGames = useCallback(async () => {
     setLoading(true);
     try {
-      const allGames = searchQuery
-        ? await db.searchGames(searchQuery)
-        : await db.getAllGames();
+      const [allGames, allCollections] = await Promise.all([
+        searchQuery ? db.searchGames(searchQuery) : db.getAllGames(),
+        db.getAllCollections(),
+      ]);
       setGames(allGames);
+      setCollections(allCollections);
     } catch (err) {
       console.error("Failed to load games:", err);
     } finally {
@@ -63,6 +67,32 @@ export function useGameLibrary() {
     [loadGames]
   );
 
+  const addCollection = useCallback(
+    async (name: string): Promise<Collection> => {
+      const col = await db.addCollection(name);
+      await loadGames();
+      return col;
+    },
+    [loadGames]
+  );
+
+  const deleteCollection = useCallback(
+    async (id: string) => {
+      await db.deleteCollection(id);
+      if (filterCollection === id) setFilterCollection(null);
+      await loadGames();
+    },
+    [loadGames, filterCollection]
+  );
+
+  const setGameCollection = useCallback(
+    async (gameId: string, collectionId: string | null) => {
+      await db.setGameCollection(gameId, collectionId);
+      await loadGames();
+    },
+    [loadGames]
+  );
+
   // Collect all tags across the library with counts
   const allTags = useMemo(() => {
     const map = new Map<string, number>();
@@ -78,6 +108,12 @@ export function useGameLibrary() {
 
   // Filtered & sorted games
   const filteredGames = games
+    // Collection filter: no collection selected → only unassigned; collection selected → that collection only
+    .filter((g) =>
+      filterCollection === null
+        ? g.collection_id === null
+        : g.collection_id === filterCollection
+    )
     .filter((g) => filterStatus === "all" || g.play_status === filterStatus)
     .filter(
       (g) =>
@@ -85,6 +121,10 @@ export function useGameLibrary() {
         filterTags.every((t) => g.tags.includes(t))
     )
     .sort((a, b) => {
+      // When a collection is active, honour user-defined order
+      if (filterCollection !== null) {
+        return a.collection_order - b.collection_order;
+      }
       let cmp = 0;
       switch (sortField) {
         case "title":
@@ -117,14 +157,20 @@ export function useGameLibrary() {
     setFilterStatus,
     filterTags,
     setFilterTags,
+    filterCollection,
+    setFilterCollection,
     sortField,
     setSortField,
     sortDirection,
     setSortDirection,
+    collections,
     addGame,
     addGames,
     updateGame,
     deleteGame,
+    addCollection,
+    deleteCollection,
+    setGameCollection,
     refresh: loadGames,
   };
 }

@@ -1,5 +1,10 @@
 export type PlayStatus = "unplayed" | "playing" | "finished" | "shelved";
 
+export interface Collection {
+  id: string;
+  name: string;
+}
+
 export interface Game {
   id: string;
   title: string;
@@ -21,6 +26,8 @@ export interface Game {
   notes: string;               // translated description
   engine: string;
   total_playtime: number;      // seconds
+  collection_id: string | null;
+  collection_order: number;
   created_at: string;
   updated_at: string;
 }

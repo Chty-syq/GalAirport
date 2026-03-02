@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Game, GameFormData } from "@/types/game";
+import type { Collection, Game, GameFormData } from "@/types/game";
 
 let db: Database | null = null;
 
@@ -83,6 +83,22 @@ async function initSchema() {
       zh TEXT NOT NULL DEFAULT ''
     )
   `);
+
+  // Collections table
+  await d.execute(`
+    CREATE TABLE IF NOT EXISTS collections (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE
+    )
+  `);
+
+  // Migration: add collection_id to games if not present
+  if (!cols.has("collection_id")) {
+    await d.execute("ALTER TABLE games ADD COLUMN collection_id TEXT");
+  }
+  if (!cols.has("collection_order")) {
+    await d.execute("ALTER TABLE games ADD COLUMN collection_order INTEGER NOT NULL DEFAULT 0");
+  }
 }
 
 function generateId(): string {
@@ -111,6 +127,8 @@ function rowToGame(row: Record<string, unknown>): Game {
     notes: row.notes as string,
     engine: row.engine as string,
     total_playtime: row.total_playtime as number,
+    collection_id: (row.collection_id as string) ?? null,
+    collection_order: (row.collection_order as number) ?? 0,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
@@ -326,4 +344,85 @@ export async function getAllTagTranslations(): Promise<TagTranslation[]> {
 export async function deleteTagTranslation(en: string): Promise<void> {
   const d = await getDb();
   await d.execute("DELETE FROM tag_translations WHERE en = $1", [en]);
+}
+
+// ─── Collections ─────────────────────────────────────────────
+
+export async function getAllCollections(): Promise<Collection[]> {
+  const d = await getDb();
+  const rows = await d.select<Record<string, unknown>[]>(
+    "SELECT id, name FROM collections ORDER BY name"
+  );
+  return rows.map((r) => ({ id: r.id as string, name: r.name as string }));
+}
+
+export async function addCollection(name: string): Promise<Collection> {
+  const d = await getDb();
+  const id = generateId();
+  await d.execute(
+    "INSERT INTO collections (id, name) VALUES ($1, $2)",
+    [id, name]
+  );
+  return { id, name };
+}
+
+export async function renameCollection(id: string, name: string): Promise<void> {
+  const d = await getDb();
+  await d.execute("UPDATE collections SET name = $1 WHERE id = $2", [name, id]);
+}
+
+export async function deleteCollection(id: string): Promise<void> {
+  const d = await getDb();
+  await d.execute("UPDATE games SET collection_id = NULL, collection_order = 0 WHERE collection_id = $1", [id]);
+  await d.execute("DELETE FROM collections WHERE id = $1", [id]);
+}
+
+export async function setGameCollection(
+  gameId: string,
+  collectionId: string | null
+): Promise<void> {
+  const d = await getDb();
+  if (collectionId === null) {
+    await d.execute(
+      "UPDATE games SET collection_id = NULL, collection_order = 0 WHERE id = $1",
+      [gameId]
+    );
+  } else {
+    const rows = await d.select<{ max_order: number | null }[]>(
+      "SELECT MAX(collection_order) as max_order FROM games WHERE collection_id = $1",
+      [collectionId]
+    );
+    const nextOrder = (rows[0]?.max_order ?? -1) + 1;
+    await d.execute(
+      "UPDATE games SET collection_id = $1, collection_order = $2 WHERE id = $3",
+      [collectionId, nextOrder, gameId]
+    );
+  }
+}
+
+export async function reorderCollectionGames(gameIds: string[]): Promise<void> {
+  const d = await getDb();
+  for (let i = 0; i < gameIds.length; i++) {
+    await d.execute(
+      "UPDATE games SET collection_order = $1 WHERE id = $2",
+      [i, gameIds[i]]
+    );
+  }
+}
+
+export async function getCollectionGames(collectionId: string): Promise<Game[]> {
+  const d = await getDb();
+  const rows = await d.select<Record<string, unknown>[]>(
+    "SELECT * FROM games WHERE collection_id = $1 ORDER BY collection_order ASC",
+    [collectionId]
+  );
+  return rows.map(rowToGame);
+}
+
+export async function getGamesWithoutCollection(): Promise<Game[]> {
+  const d = await getDb();
+  const rows = await d.select<Record<string, unknown>[]>(
+    "SELECT * FROM games WHERE collection_id IS NULL ORDER BY title"
+  );
+  return rows.map(rowToGame);
 }

@@ -5,6 +5,7 @@ import {
   ArrowUpDown,
   Plus,
   FolderSearch,
+  FolderPlus,
 } from "lucide-react";
 import type { ViewMode, SortField, SortDirection } from "@/types/game";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ interface Props {
   onViewModeChange: (m: ViewMode) => void;
   onAddGame: () => void;
   onScanGames: () => void;
+  onNewCollection: () => void;
   gameCount: number;
 }
 
@@ -72,6 +74,15 @@ export function Toolbar(props: Props) {
         >
           <FolderSearch className="w-4 h-4" />
           导入游戏
+        </button>
+
+        <button
+          onClick={props.onNewCollection}
+          className="flex items-center gap-1.5 px-3 py-2 bg-surface-2 border border-surface-3 hover:bg-surface-3 text-text-secondary rounded-lg text-sm font-medium transition-colors"
+          title="合集管理"
+        >
+          <FolderPlus className="w-4 h-4" />
+          合集管理
         </button>
 
         {/* Sort */}

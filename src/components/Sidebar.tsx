@@ -1,5 +1,5 @@
-import { Gamepad2, Tag, X, Sun, Moon, Settings } from "lucide-react";
-import type { PlayStatus } from "@/types/game";
+import { Gamepad2, Tag, X, Sun, Moon, Settings, FolderOpen } from "lucide-react";
+import type { Collection, PlayStatus } from "@/types/game";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -15,6 +15,10 @@ interface Props {
   filterTags: string[];
   onFilterTagsChange: (tags: string[]) => void;
   allTags: TagInfo[];
+  collections: Collection[];
+  filterCollection: string | null;
+  onFilterCollection: (id: string | null) => void;
+  allGames: { collection_id: string | null }[];
   onSettings: () => void;
 }
 
@@ -33,6 +37,10 @@ export function Sidebar({
   filterTags,
   onFilterTagsChange,
   allTags,
+  collections,
+  filterCollection,
+  onFilterCollection,
+  allGames,
   onSettings,
 }: Props) {
   const { theme, toggleTheme } = useTheme();
@@ -44,6 +52,9 @@ export function Sidebar({
       onFilterTagsChange([...filterTags, tag]);
     }
   };
+
+  const getCollectionCount = (id: string) =>
+    allGames.filter((g) => g.collection_id === id).length;
 
   return (
     <aside className="w-56 flex-shrink-0 bg-surface-1 border-r border-surface-3/50 flex flex-col h-full overflow-hidden">
@@ -90,6 +101,54 @@ export function Sidebar({
             </button>
           ))}
         </nav>
+      </div>
+
+      {/* Divider */}
+      <div className="mx-5 border-t border-surface-3/60 my-2" />
+
+      {/* Collection filter */}
+      <div className="px-3 pb-2">
+        <div className="px-2 mb-1.5">
+          <p className="text-[10px] font-medium text-text-muted/60 uppercase tracking-wider flex items-center gap-1">
+            <FolderOpen className="w-3 h-3" />
+            合集
+          </p>
+        </div>
+        {collections.length === 0 ? (
+          <p className="text-[10px] text-text-muted/50 px-2 py-1">
+            暂无合集
+          </p>
+        ) : (
+          <nav className="space-y-0.5">
+            {collections.map((col) => {
+              const count = getCollectionCount(col.id);
+              const active = filterCollection === col.id;
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => onFilterCollection(active ? null : col.id)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors",
+                    active
+                      ? "bg-accent/10 text-accent font-medium"
+                      : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className={cn(
+                      "w-2 h-2 rounded-full flex-shrink-0",
+                      active ? "bg-accent" : "bg-text-muted/30"
+                    )} />
+                    <span className="truncate">{col.name}</span>
+                  </div>
+                  <span className="text-[10px] text-text-muted/50 flex-shrink-0 ml-2">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
       {/* Divider */}

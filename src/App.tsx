@@ -14,6 +14,7 @@ import { GameDetail } from "@/components/GameDetail";
 import { ScanDialog } from "@/components/ScanDialog";
 import { VndbMatchDialog } from "@/components/VndbMatchDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
+import { CollectionManagerDialog } from "@/components/CollectionDialog";
 
 function App() {
   const library = useGameLibrary();
@@ -25,6 +26,7 @@ function App() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [vndbMatchGame, setVndbMatchGame] = useState<Game | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCollectionDialog, setShowCollectionDialog] = useState(false);
   const [runningGameId, setRunningGameId] = useState<string | null>(null);
 
   // Listen for playtime session ended events from Rust
@@ -110,6 +112,10 @@ function App() {
         filterTags={library.filterTags}
         onFilterTagsChange={library.setFilterTags}
         allTags={library.allTags}
+        collections={library.collections}
+        filterCollection={library.filterCollection}
+        onFilterCollection={library.setFilterCollection}
+        allGames={library.allGames}
         onSettings={() => setShowSettings(true)}
       />
 
@@ -129,6 +135,7 @@ function App() {
             onViewModeChange={setViewMode}
             onAddGame={handleAddGame}
             onScanGames={() => setShowScan(true)}
+            onNewCollection={() => setShowCollectionDialog(true)}
             gameCount={library.games.length}
           />
 
@@ -226,6 +233,13 @@ function App() {
 
       {showSettings && (
         <SettingsDialog onClose={() => setShowSettings(false)} />
+      )}
+
+      {showCollectionDialog && (
+        <CollectionManagerDialog
+          onClose={() => setShowCollectionDialog(false)}
+          onChanged={library.refresh}
+        />
       )}
 
       {/* Delete confirmation */}
