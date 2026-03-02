@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
 /// Known galgame engine signatures: (marker file/pattern, engine name)
@@ -171,11 +171,33 @@ fn scan_games(paths: Vec<String>) -> Result<Vec<DetectedGame>, String> {
 }
 
 #[tauri::command]
-fn launch_game(exe_path: String) -> Result<(), String> {
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", &exe_path])
+fn launch_game(app_handle: tauri::AppHandle, exe_path: String, game_id: String) -> Result<(), String> {
+    let path = Path::new(&exe_path);
+    let working_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+
+    let mut child = std::process::Command::new(&exe_path)
+        .current_dir(&working_dir)
         .spawn()
         .map_err(|e| format!("Failed to launch game: {}", e))?;
+
+    let start_time = chrono::Utc::now().to_rfc3339();
+    let instant = std::time::Instant::now();
+
+    std::thread::spawn(move || {
+        let _ = child.wait();
+        let duration_secs = instant.elapsed().as_secs();
+        let end_time = chrono::Utc::now().to_rfc3339();
+        let _ = app_handle.emit(
+            "playtime_session_ended",
+            serde_json::json!({
+                "game_id": game_id,
+                "start_time": start_time,
+                "end_time": end_time,
+                "duration": duration_secs,
+            }),
+        );
+    });
+
     Ok(())
 }
 

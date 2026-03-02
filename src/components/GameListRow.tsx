@@ -1,23 +1,20 @@
 import { Play, Star, Clock, Edit, Trash2 } from "lucide-react";
 import type { Game } from "@/types/game";
 import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
-import { invoke } from "@tauri-apps/api/core";
 
 interface Props {
   game: Game;
   onEdit: (game: Game) => void;
   onDelete: (id: string) => void;
   onClick: (game: Game) => void;
+  onLaunch: (game: Game) => void;
+  isRunning: boolean;
 }
 
-export function GameListRow({ game, onEdit, onDelete, onClick }: Props) {
-  const handleLaunch = async (e: React.MouseEvent) => {
+export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunning }: Props) {
+  const handleLaunch = (e: React.MouseEvent) => {
     e.stopPropagation();
-    try {
-      await invoke("launch_game", { exePath: game.exe_path });
-    } catch (err) {
-      console.error("Failed to launch:", err);
-    }
+    if (!isRunning) onLaunch(game);
   };
 
   const stars = Array.from({ length: 5 }, (_, i) => i < Math.round(game.rating / 2));
@@ -53,14 +50,21 @@ export function GameListRow({ game, onEdit, onDelete, onClick }: Props) {
       </div>
 
       {/* Status */}
-      <span
-        className={cn(
-          "px-2 py-0.5 rounded-full text-[11px] font-medium text-white/90 flex-shrink-0",
-          statusColor(game.play_status)
-        )}
-      >
-        {statusLabel(game.play_status)}
-      </span>
+      {isRunning ? (
+        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-white bg-green-600/90 flex-shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+          运行中
+        </span>
+      ) : (
+        <span
+          className={cn(
+            "px-2 py-0.5 rounded-full text-[11px] font-medium text-white/90 flex-shrink-0",
+            statusColor(game.play_status)
+          )}
+        >
+          {statusLabel(game.play_status)}
+        </span>
+      )}
 
       {/* Rating */}
       <div className="flex gap-0.5 flex-shrink-0">
@@ -83,8 +87,9 @@ export function GameListRow({ game, onEdit, onDelete, onClick }: Props) {
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
         <button
           onClick={handleLaunch}
-          className="w-8 h-8 rounded-lg bg-accent/20 hover:bg-accent/40 flex items-center justify-center transition-colors"
-          title="启动游戏"
+          disabled={isRunning}
+          className="w-8 h-8 rounded-lg bg-accent/20 hover:bg-accent/40 disabled:opacity-40 flex items-center justify-center transition-colors"
+          title={isRunning ? "游戏运行中" : "启动游戏"}
         >
           <Play className="w-3.5 h-3.5 text-accent" fill="currentColor" />
         </button>

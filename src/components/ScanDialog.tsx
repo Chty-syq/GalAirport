@@ -248,81 +248,104 @@ export function ScanDialog({ onImport, onClose }: Props) {
 
   const pickCandidate = async (vn: VndbVn) => {
     if (activeIdx === null) return;
+    // Snapshot idx now — activeIdx may change while async work runs
+    const targetIdx = activeIdx;
 
-    let fullVn = await getVnById(vn.id);
-    if (!fullVn) fullVn = vn;
-
-    const apiKey = await db.getSetting("deepseek_api_key");
-
-    // Run all processing in parallel
-    const coverPromise = (async () => {
-      if (fullVn!.image?.url) {
-        try {
-          const ext = fullVn!.image.url.split(".").pop() || "jpg";
-          return await invoke<string>("download_cover", {
-            url: fullVn!.image.url,
-            filename: `${fullVn!.id}.${ext}`,
-          });
-        } catch (err) {
-          toast("error", `「${pickDisplayTitle(fullVn!)}」封面下载失败: ${err}`);
-        }
-      }
-      return "";
-    })();
-
-    const screenshotsPromise = (async () => {
-      if (!fullVn!.screenshots?.length) return [];
-      const safe = fullVn!.screenshots.filter((s) => s.sexual < 1 && s.violence < 1).slice(0, 4);
-      const results = await Promise.allSettled(
-        safe.map((ss) => {
-          const ext = ss.url.split(".").pop() || "jpg";
-          return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}` });
-        })
-      );
-      return results
-        .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
-        .map((r) => r.value);
-    })();
-
-    const descPromise = (async () => {
-      if (!fullVn!.description) return "";
-      if (apiKey) {
-        try {
-          return await translateDescription(fullVn!.description, apiKey);
-        } catch (err) {
-          toast("warning", `「${pickDisplayTitle(fullVn!)}」简介翻译失败: ${err}`);
-          return cleanDescription(fullVn!.description);
-        }
-      }
-      return cleanDescription(fullVn!.description);
-    })();
-
-    const tagsPromise = (async () => {
-      const vndbTags = extractTags(fullVn!.tags || []);
-      if (apiKey && vndbTags.length > 0) {
-        try {
-          return await translateTags(vndbTags, apiKey);
-        } catch {
-          return vndbTags;
-        }
-      }
-      return vndbTags;
-    })();
-
-    const [coverPath, screenshotPaths, translatedDesc, translatedTags] = await Promise.all([
-      coverPromise,
-      screenshotsPromise,
-      descPromise,
-      tagsPromise,
-    ]);
-
+    // Immediately show the selected VN so the UI responds at once
     setItems((prev) =>
       prev.map((it, idx) =>
-        idx === activeIdx
-          ? { ...it, vndb: fullVn, coverPath, screenshotPaths, translatedDesc, translatedTags, status: "matched", error: undefined }
+        idx === targetIdx
+          ? { ...it, vndb: vn, status: "matching", error: undefined }
           : it
       )
     );
+
+    try {
+      let fullVn = await getVnById(vn.id);
+      if (!fullVn) fullVn = vn;
+
+      // Update developers as soon as they arrive
+      setItems((prev) =>
+        prev.map((it, idx) => (idx === targetIdx ? { ...it, vndb: fullVn! } : it))
+      );
+
+      const apiKey = await db.getSetting("deepseek_api_key");
+
+      const coverPromise = (async () => {
+        if (fullVn!.image?.url) {
+          try {
+            const ext = fullVn!.image.url.split(".").pop() || "jpg";
+            return await invoke<string>("download_cover", {
+              url: fullVn!.image.url,
+              filename: `${fullVn!.id}.${ext}`,
+            });
+          } catch (err) {
+            toast("error", `「${pickDisplayTitle(fullVn!)}」封面下载失败: ${err}`);
+          }
+        }
+        return "";
+      })();
+
+      const screenshotsPromise = (async () => {
+        if (!fullVn!.screenshots?.length) return [];
+        const safe = fullVn!.screenshots.filter((s) => s.sexual < 1 && s.violence < 1).slice(0, 4);
+        const results = await Promise.allSettled(
+          safe.map((ss) => {
+            const ext = ss.url.split(".").pop() || "jpg";
+            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}` });
+          })
+        );
+        return results
+          .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+          .map((r) => r.value);
+      })();
+
+      const descPromise = (async () => {
+        if (!fullVn!.description) return "";
+        if (apiKey) {
+          try {
+            return await translateDescription(fullVn!.description, apiKey);
+          } catch (err) {
+            toast("warning", `「${pickDisplayTitle(fullVn!)}」简介翻译失败: ${err}`);
+            return cleanDescription(fullVn!.description);
+          }
+        }
+        return cleanDescription(fullVn!.description);
+      })();
+
+      const tagsPromise = (async () => {
+        const vndbTags = extractTags(fullVn!.tags || []);
+        if (apiKey && vndbTags.length > 0) {
+          try {
+            return await translateTags(vndbTags, apiKey);
+          } catch {
+            return vndbTags;
+          }
+        }
+        return vndbTags;
+      })();
+
+      const [coverPath, screenshotPaths, translatedDesc, translatedTags] = await Promise.all([
+        coverPromise,
+        screenshotsPromise,
+        descPromise,
+        tagsPromise,
+      ]);
+
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === targetIdx
+            ? { ...it, vndb: fullVn!, coverPath, screenshotPaths, translatedDesc, translatedTags, status: "matched", error: undefined }
+            : it
+        )
+      );
+    } catch (err) {
+      setItems((prev) =>
+        prev.map((it, idx) =>
+          idx === targetIdx ? { ...it, status: "failed", error: `处理失败: ${err}` } : it
+        )
+      );
+    }
   };
 
   const clearMatch = () => {
@@ -367,6 +390,8 @@ export function ScanDialog({ onImport, onClose }: Props) {
         play_status: "unplayed" as const,
         rating: 0,
         vndb_rating: vn?.rating || 0,
+        vndb_votecount: vn?.votecount || 0,
+        length_minutes: vn?.length_minutes || 0,
         notes: item.translatedDesc || (vn?.description ? cleanDescription(vn.description) : ""),
         engine: item.detected.engine || "",
       };

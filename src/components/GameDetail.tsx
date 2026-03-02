@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Play, FolderOpen, Clock, Star, Tag, Globe, Edit } from "lucide-react";
+import { X, Play, FolderOpen, Clock, Star, Tag, Globe, Edit, Users } from "lucide-react";
 import type { Game } from "@/types/game";
 import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { invoke } from "@tauri-apps/api/core";
@@ -8,19 +8,13 @@ interface Props {
   game: Game;
   onClose: () => void;
   onEdit: (game: Game) => void;
+  onLaunch: (game: Game) => void;
+  isRunning: boolean;
   onVndbMatch?: (game: Game) => void;
 }
 
-export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
+export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbMatch }: Props) {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
-
-  const handleLaunch = async () => {
-    try {
-      await invoke("launch_game", { exePath: game.exe_path });
-    } catch (err) {
-      console.error("Failed to launch:", err);
-    }
-  };
 
   const openFolder = async () => {
     await invoke("open_folder", { path: game.install_path });
@@ -106,15 +100,32 @@ export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
             )}
             {vndbScore && (
               <div className="flex justify-between items-center">
-                <span className="text-text-muted">评分</span>
-                <span className="text-accent flex items-center gap-1">
+                <span className="text-text-muted">VNDB 评分</span>
+                <span className="text-accent flex items-center gap-1.5">
                   <Star className="w-3 h-3" fill="currentColor" />
                   {vndbScore}
+                  {game.vndb_votecount > 0 && (
+                    <span className="text-text-muted flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      {game.vndb_votecount.toLocaleString()}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+            {game.length_minutes > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-text-muted">平均游玩时长</span>
+                <span className="text-text-primary flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5" />
+                  {Math.floor(game.length_minutes / 60) > 0
+                    ? `${Math.floor(game.length_minutes / 60)} 小时${game.length_minutes % 60 > 0 ? ` ${game.length_minutes % 60} 分钟` : ""}`
+                    : `${game.length_minutes} 分钟`}
                 </span>
               </div>
             )}
             <div className="flex justify-between items-center">
-              <span className="text-text-muted">游玩时间</span>
+              <span className="text-text-muted">我的游玩时间</span>
               <span className="text-text-primary flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
                 {game.total_playtime > 0
@@ -223,10 +234,20 @@ export function GameDetail({ game, onClose, onEdit, onVndbMatch }: Props) {
               <FolderOpen className="w-4 h-4" /> 打开目录
             </button>
             <button
-              onClick={handleLaunch}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 hover:bg-surface-4 text-text-primary rounded-lg text-sm transition-colors"
+              onClick={() => !isRunning && onLaunch(game)}
+              disabled={isRunning}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 hover:bg-surface-4 disabled:opacity-50 text-text-primary rounded-lg text-sm transition-colors"
             >
-              <Play className="w-4 h-4" fill="currentColor" /> 启动游戏
+              {isRunning ? (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                  运行中
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" fill="currentColor" /> 启动游戏
+                </>
+              )}
             </button>
             <button
               onClick={() => onEdit(game)}

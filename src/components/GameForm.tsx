@@ -25,6 +25,8 @@ const defaultForm: GameFormData = {
   play_status: "unplayed",
   rating: 0,
   vndb_rating: 0,
+  vndb_votecount: 0,
+  length_minutes: 0,
   notes: "",
   engine: "",
 };
@@ -57,6 +59,8 @@ export function GameForm({ game, onSave, onClose }: Props) {
         play_status: game.play_status,
         rating: game.rating,
         vndb_rating: game.vndb_rating || 0,
+        vndb_votecount: game.vndb_votecount || 0,
+        length_minutes: game.length_minutes || 0,
         notes: game.notes,
         engine: game.engine,
       });
