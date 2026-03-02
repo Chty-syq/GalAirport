@@ -11,7 +11,7 @@ interface TagInfo {
 interface Props {
   gameCount: number;
   filterStatus: PlayStatus | "all";
-  onFilterStatusChange: (s: PlayStatus | "all") => void;
+  onFilterStatusChange: (s: PlayStatus | "all") => void;  // pass "all" to clear
   filterTags: string[];
   onFilterTagsChange: (tags: string[]) => void;
   allTags: TagInfo[];
@@ -22,12 +22,11 @@ interface Props {
   onSettings: () => void;
 }
 
-const STATUS_OPTIONS: { value: PlayStatus | "all"; label: string; dot?: string }[] = [
-  { value: "all", label: "全部游戏" },
+const STATUS_OPTIONS: { value: PlayStatus; label: string; dot: string }[] = [
   { value: "playing", label: "游玩中", dot: "bg-status-playing" },
   { value: "unplayed", label: "未开始", dot: "bg-status-unplayed" },
   { value: "finished", label: "已通关", dot: "bg-status-finished" },
-  { value: "shelved", label: "已搁置", dot: "bg-status-shelved" },
+  { value: "completed", label: "全线通关", dot: "bg-status-completed" },
 ];
 
 export function Sidebar({
@@ -81,25 +80,24 @@ export function Sidebar({
           状态
         </p>
         <nav className="space-y-0.5">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => onFilterStatusChange(opt.value)}
-              className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs transition-colors",
-                filterStatus === opt.value
-                  ? "bg-accent/10 text-accent font-medium"
-                  : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
-              )}
-            >
-              {opt.dot ? (
+          {STATUS_OPTIONS.map((opt) => {
+            const active = filterStatus === opt.value;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => onFilterStatusChange(active ? "all" : opt.value)}
+                className={cn(
+                  "w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs transition-colors",
+                  active
+                    ? "bg-accent/10 text-accent font-medium"
+                    : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+                )}
+              >
                 <span className={cn("w-2 h-2 rounded-full flex-shrink-0", opt.dot)} />
-              ) : (
-                <span className="w-2 h-2 rounded-full flex-shrink-0 bg-text-muted/30" />
-              )}
-              {opt.label}
-            </button>
-          ))}
+                {opt.label}
+              </button>
+            );
+          })}
         </nav>
       </div>
 

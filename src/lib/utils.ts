@@ -34,7 +34,7 @@ export function statusLabel(status: PlayStatus): string {
     unplayed: "未开始",
     playing: "游玩中",
     finished: "已通关",
-    shelved: "已搁置",
+    completed: "全线通关",
   };
   return map[status];
 }
@@ -44,7 +44,7 @@ export function statusColor(status: PlayStatus): string {
     unplayed: "bg-status-unplayed",
     playing: "bg-status-playing",
     finished: "bg-status-finished",
-    shelved: "bg-status-shelved",
+    completed: "bg-status-completed",
   };
   return map[status];
 }

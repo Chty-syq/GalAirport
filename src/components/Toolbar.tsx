@@ -6,6 +6,7 @@ import {
   Plus,
   FolderSearch,
   FolderPlus,
+  CheckSquare,
 } from "lucide-react";
 import type { ViewMode, SortField, SortDirection } from "@/types/game";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,8 @@ interface Props {
   onAddGame: () => void;
   onScanGames: () => void;
   onNewCollection: () => void;
+  selectionMode: boolean;
+  onToggleSelectionMode: () => void;
   gameCount: number;
 }
 
@@ -83,6 +86,20 @@ export function Toolbar(props: Props) {
         >
           <FolderPlus className="w-4 h-4" />
           合集管理
+        </button>
+
+        <button
+          onClick={props.onToggleSelectionMode}
+          className={cn(
+            "flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium transition-colors",
+            props.selectionMode
+              ? "bg-accent/10 border-accent text-accent"
+              : "bg-surface-2 border-surface-3 hover:bg-surface-3 text-text-secondary"
+          )}
+          title="多选"
+        >
+          <CheckSquare className="w-4 h-4" />
+          多选
         </button>
 
         {/* Sort */}

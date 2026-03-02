@@ -26,6 +26,7 @@ export default {
           playing: "rgb(var(--status-playing) / <alpha-value>)",
           finished: "rgb(var(--status-finished) / <alpha-value>)",
           shelved: "rgb(var(--status-shelved) / <alpha-value>)",
+          completed: "rgb(var(--status-completed) / <alpha-value>)",
         },
       },
       fontFamily: {

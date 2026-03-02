@@ -1,4 +1,4 @@
-export type PlayStatus = "unplayed" | "playing" | "finished" | "shelved";
+export type PlayStatus = "unplayed" | "playing" | "finished" | "completed";
 
 export interface Collection {
   id: string;

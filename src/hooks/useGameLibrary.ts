@@ -67,6 +67,14 @@ export function useGameLibrary() {
     [loadGames]
   );
 
+  const deleteGames = useCallback(
+    async (ids: string[]) => {
+      await db.deleteGames(ids);
+      await loadGames();
+    },
+    [loadGames]
+  );
+
   const addCollection = useCallback(
     async (name: string): Promise<Collection> => {
       const col = await db.addCollection(name);
@@ -168,6 +176,7 @@ export function useGameLibrary() {
     addGames,
     updateGame,
     deleteGame,
+    deleteGames,
     addCollection,
     deleteCollection,
     setGameCollection,

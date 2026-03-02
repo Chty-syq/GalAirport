@@ -1,6 +1,7 @@
-import { Play, Star, Clock, Edit, Trash2 } from "lucide-react";
-import type { Game } from "@/types/game";
-import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
+import { Play, Star, Clock, Edit, Trash2, Check } from "lucide-react";
+import type { Game, PlayStatus } from "@/types/game";
+import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
+import { StatusDropdown } from "@/components/StatusDropdown";
 
 interface Props {
   game: Game;
@@ -9,9 +10,13 @@ interface Props {
   onClick: (game: Game) => void;
   onLaunch: (game: Game) => void;
   isRunning: boolean;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onStatusChange?: (id: string, status: PlayStatus) => void;
 }
 
-export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunning }: Props) {
+export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunning, selectionMode, isSelected, onToggleSelect, onStatusChange }: Props) {
   const handleLaunch = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isRunning) onLaunch(game);
@@ -21,9 +26,25 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
 
   return (
     <div
-      className="group flex items-center gap-4 px-4 py-3 bg-surface-1 hover:bg-surface-2 rounded-lg cursor-pointer transition-colors"
-      onClick={() => onClick(game)}
+      className={cn(
+        "group flex items-center gap-4 px-4 py-3 rounded-lg cursor-pointer transition-colors",
+        selectionMode && isSelected ? "bg-accent/8 hover:bg-accent/12" : "bg-surface-1 hover:bg-surface-2"
+      )}
+      onClick={() => selectionMode ? onToggleSelect?.(game.id) : onClick(game)}
     >
+      {/* Checkbox (selection mode) or mini cover */}
+      {selectionMode ? (
+        <div
+          className={cn(
+            "w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors",
+            isSelected ? "bg-accent border-accent" : "border-surface-3"
+          )}
+          onClick={(e) => { e.stopPropagation(); onToggleSelect?.(game.id); }}
+        >
+          {isSelected && <Check className="w-3 h-3 text-white" />}
+        </div>
+      ) : null}
+
       {/* Mini cover */}
       <div className="w-10 h-14 rounded-md overflow-hidden bg-surface-3 flex-shrink-0">
         {game.cover_path ? (
@@ -56,13 +77,12 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
           运行中
         </span>
       ) : (
-        <span
-          className={cn(
-            "px-2 py-0.5 rounded-full text-[11px] font-medium text-white/90 flex-shrink-0",
-            statusColor(game.play_status)
-          )}
-        >
-          {statusLabel(game.play_status)}
+        <span className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <StatusDropdown
+            status={game.play_status}
+            onChange={(s) => onStatusChange?.(game.id, s)}
+            disabled={selectionMode}
+          />
         </span>
       )}
 
@@ -84,7 +104,7 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
       </span>
 
       {/* Actions */}
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+      <div className={cn("flex gap-1 transition-opacity flex-shrink-0", selectionMode ? "invisible" : "opacity-0 group-hover:opacity-100")}>
         <button
           onClick={handleLaunch}
           disabled={isRunning}

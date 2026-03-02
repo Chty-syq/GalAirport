@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { X, Play, FolderOpen, Clock, Star, Tag, Globe, Edit, Users } from "lucide-react";
-import type { Game } from "@/types/game";
-import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
+import type { Game, PlayStatus } from "@/types/game";
+import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
+import { StatusDropdown } from "@/components/StatusDropdown";
 import { invoke } from "@tauri-apps/api/core";
 
 interface Props {
@@ -11,9 +12,10 @@ interface Props {
   onLaunch: (game: Game) => void;
   isRunning: boolean;
   onVndbMatch?: (game: Game) => void;
+  onStatusChange?: (id: string, status: PlayStatus) => void;
 }
 
-export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbMatch }: Props) {
+export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbMatch, onStatusChange }: Props) {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   const openFolder = async () => {
@@ -62,14 +64,13 @@ export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbM
         {/* Content */}
         <div className="px-6 pb-8 -mt-8 relative">
           {/* Status */}
-          <span
-            className={cn(
-              "inline-block px-3 py-1 rounded-full text-xs font-medium text-white/90 mb-3",
-              statusColor(game.play_status)
-            )}
-          >
-            {statusLabel(game.play_status)}
-          </span>
+          <div className="mb-3">
+            <StatusDropdown
+              status={game.play_status}
+              onChange={(s) => onStatusChange?.(game.id, s)}
+              className="px-3 py-1 text-xs"
+            />
+          </div>
 
           <h1 className="text-2xl font-bold text-text-primary leading-tight">
             {game.title}

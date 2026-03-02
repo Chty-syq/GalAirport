@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Gamepad2 } from "lucide-react";
+import { Gamepad2, Trash2, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import type { Game, GameFormData, ViewMode } from "@/types/game";
@@ -28,6 +29,9 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showCollectionDialog, setShowCollectionDialog] = useState(false);
   const [runningGameId, setRunningGameId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
 
   // Listen for playtime session ended events from Rust
   useEffect(() => {
@@ -102,6 +106,41 @@ function App() {
     }
   };
 
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectGame = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === library.games.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(library.games.map((g) => g.id)));
+    }
+  };
+
+  const handleStatusChange = useCallback(async (id: string, status: import("@/types/game").PlayStatus) => {
+    await library.updateGame(id, { play_status: status });
+    // Keep selectedGame in sync if it's currently open
+    setSelectedGame((prev) => prev?.id === id ? { ...prev, play_status: status } : prev);
+  }, [library]);
+
+  const confirmBulkDelete = async () => {
+    await library.deleteGames(Array.from(selectedIds));
+    setBulkDeleteConfirm(false);
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
   return (
     <div className="h-screen flex bg-surface-0 overflow-hidden">
       {/* Sidebar */}
@@ -136,8 +175,53 @@ function App() {
             onAddGame={handleAddGame}
             onScanGames={() => setShowScan(true)}
             onNewCollection={() => setShowCollectionDialog(true)}
+            selectionMode={selectionMode}
+            onToggleSelectionMode={toggleSelectionMode}
             gameCount={library.games.length}
           />
+
+          {/* Selection action bar */}
+          {selectionMode && (
+            <div className="flex items-center gap-4 mt-4 px-4 py-2.5 bg-surface-2 border border-surface-3 rounded-lg">
+              {/* Select all checkbox */}
+              <button
+                onClick={toggleSelectAll}
+                className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <div className={cn(
+                  "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors",
+                  selectedIds.size > 0 && selectedIds.size === library.games.length
+                    ? "bg-accent border-accent"
+                    : selectedIds.size > 0
+                    ? "bg-accent/40 border-accent"
+                    : "border-surface-4"
+                )}>
+                  {selectedIds.size > 0 && <Check className="w-2.5 h-2.5 text-white" />}
+                </div>
+                全选
+              </button>
+
+              <span className="text-xs text-text-muted flex-1">
+                {selectedIds.size > 0 ? `已选 ${selectedIds.size} 个` : "点击游戏以选择"}
+              </span>
+
+              <button
+                onClick={() => setBulkDeleteConfirm(true)}
+                disabled={selectedIds.size === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-status-shelved/10 hover:bg-status-shelved/20 disabled:opacity-40 text-status-shelved text-xs font-medium rounded-lg transition-colors"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                删除{selectedIds.size > 0 ? ` (${selectedIds.size})` : ""}
+              </button>
+
+              <button
+                onClick={toggleSelectionMode}
+                className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              >
+                取消
+              </button>
+            </div>
+          )}
 
           {/* Game library */}
           <div className="mt-5">
@@ -168,6 +252,10 @@ function App() {
                     onClick={setSelectedGame}
                     onLaunch={handleLaunchGame}
                     isRunning={runningGameId === game.id}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(game.id)}
+                    onToggleSelect={toggleSelectGame}
+                    onStatusChange={handleStatusChange}
                   />
                 ))}
               </div>
@@ -182,6 +270,10 @@ function App() {
                     onClick={setSelectedGame}
                     onLaunch={handleLaunchGame}
                     isRunning={runningGameId === game.id}
+                    selectionMode={selectionMode}
+                    isSelected={selectedIds.has(game.id)}
+                    onToggleSelect={toggleSelectGame}
+                    onStatusChange={handleStatusChange}
                   />
                 ))}
               </div>
@@ -209,6 +301,7 @@ function App() {
           onEdit={handleEditGame}
           onLaunch={handleLaunchGame}
           isRunning={runningGameId === selectedGame.id}
+          onStatusChange={handleStatusChange}
           onVndbMatch={(game) => {
             setSelectedGame(null);
             setVndbMatchGame(game);
@@ -240,6 +333,38 @@ function App() {
           onClose={() => setShowCollectionDialog(false)}
           onChanged={library.refresh}
         />
+      )}
+
+      {/* Bulk delete confirmation */}
+      {bulkDeleteConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div
+            className="absolute inset-0 dialog-overlay backdrop-blur-sm"
+            onClick={() => setBulkDeleteConfirm(false)}
+          />
+          <div className="relative bg-surface-1 border border-surface-3 rounded-xl p-6 shadow-2xl max-w-sm w-full">
+            <h3 className="text-base font-semibold text-text-primary mb-2">
+              确认批量删除
+            </h3>
+            <p className="text-sm text-text-secondary mb-5">
+              确定要从库中移除 <span className="font-medium text-text-primary">{selectedIds.size}</span> 个游戏吗？此操作不会删除本地文件。
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setBulkDeleteConfirm(false)}
+                className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={confirmBulkDelete}
+                className="px-4 py-2 bg-status-shelved hover:bg-status-shelved/80 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete confirmation */}

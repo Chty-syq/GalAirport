@@ -1,6 +1,7 @@
-import { Play, Star, Clock, MoreVertical, Trash2, Edit, FolderOpen, Save } from "lucide-react";
-import type { Game } from "@/types/game";
-import { statusLabel, statusColor, formatPlaytime, cn, coverSrc } from "@/lib/utils";
+import { Play, Star, Clock, MoreVertical, Trash2, Edit, FolderOpen, Save, Check } from "lucide-react";
+import type { Game, PlayStatus } from "@/types/game";
+import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
+import { StatusDropdown } from "@/components/StatusDropdown";
 import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useToast } from "@/components/Toast";
@@ -12,9 +13,13 @@ interface Props {
   onClick: (game: Game) => void;
   onLaunch: (game: Game) => void;
   isRunning: boolean;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onStatusChange?: (id: string, status: PlayStatus) => void;
 }
 
-export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning }: Props) {
+export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning, selectionMode, isSelected, onToggleSelect, onStatusChange }: Props) {
   const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -41,8 +46,11 @@ export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning 
 
   return (
     <div
-      className="group relative bg-surface-2 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:bg-surface-3 hover:shadow-lg hover:shadow-accent/5 hover:-translate-y-0.5"
-      onClick={() => onClick(game)}
+      className={cn(
+        "group relative bg-surface-2 rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:bg-surface-3 hover:shadow-lg hover:shadow-accent/5 hover:-translate-y-0.5",
+        selectionMode && isSelected && "ring-2 ring-accent ring-offset-2 ring-offset-surface-0"
+      )}
+      onClick={() => selectionMode ? onToggleSelect?.(game.id) : onClick(game)}
     >
       {/* Cover image */}
       <div className="relative aspect-[3/4] bg-surface-3 overflow-hidden">
@@ -75,27 +83,41 @@ export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning 
           </button>
         )}
 
+        {/* Selection checkbox */}
+        {selectionMode && (
+          <div
+            className="absolute top-2 left-2 z-10"
+            onClick={(e) => { e.stopPropagation(); onToggleSelect?.(game.id); }}
+          >
+            <div className={cn(
+              "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shadow-sm",
+              isSelected
+                ? "bg-accent border-accent"
+                : "bg-black/40 border-white/60 backdrop-blur-sm"
+            )}>
+              {isSelected && <Check className="w-3 h-3 text-white" />}
+            </div>
+          </div>
+        )}
+
         {/* Status badge */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1">
+        <div className={cn("absolute flex flex-col gap-1", selectionMode ? "top-2.5 left-8" : "top-2.5 left-2.5")}>
           {isRunning ? (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium text-white bg-green-600/90 backdrop-blur-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
               运行中
             </span>
           ) : (
-            <span
-              className={cn(
-                "px-2 py-0.5 rounded-full text-[11px] font-medium text-white/90 backdrop-blur-sm",
-                statusColor(game.play_status)
-              )}
-            >
-              {statusLabel(game.play_status)}
-            </span>
+            <StatusDropdown
+              status={game.play_status}
+              onChange={(s) => onStatusChange?.(game.id, s)}
+              disabled={selectionMode}
+            />
           )}
         </div>
 
         {/* Context menu */}
-        <div className="absolute top-2 right-2" ref={menuRef}>
+        {!selectionMode && <div className="absolute top-2 right-2" ref={menuRef}>
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -159,7 +181,7 @@ export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning 
               </button>
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Info section */}

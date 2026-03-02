@@ -26,6 +26,7 @@ html[data-theme="dark"] {
   --status-playing: 245 166 35;
   --status-finished: 76 217 100;
   --status-shelved: 255 107 107;
+  --status-completed: 192 132 252;
 
   --scrollbar-thumb: #2c2c3a;
   --scrollbar-thumb-hover: #3a3a4a;
@@ -53,6 +54,7 @@ html[data-theme="light"] {
   --status-playing: 212 140 16;
   --status-finished: 45 168 69;
   --status-shelved: 224 78 78;
+  --status-completed: 147 51 234;
 
   --scrollbar-thumb: #d5d4df;
   --scrollbar-thumb-hover: #c0bfcc;

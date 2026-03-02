@@ -35,7 +35,7 @@ const STATUS_OPTIONS: { value: PlayStatus; label: string }[] = [
   { value: "unplayed", label: "未开始" },
   { value: "playing", label: "游玩中" },
   { value: "finished", label: "已通关" },
-  { value: "shelved", label: "已搁置" },
+  { value: "completed", label: "全线通关" },
 ];
 
 export function GameForm({ game, onSave, onClose }: Props) {
