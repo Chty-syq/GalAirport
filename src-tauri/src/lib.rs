@@ -174,6 +174,8 @@ fn scan_games(paths: Vec<String>) -> Result<Vec<DetectedGame>, String> {
 fn launch_game(app_handle: tauri::AppHandle, exe_path: String, game_id: String) -> Result<(), String> {
     let path = Path::new(&exe_path);
     let working_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+    // Normalise to lowercase for case-insensitive comparison on Windows
+    let install_dir = working_dir.to_string_lossy().to_lowercase();
 
     let mut child = std::process::Command::new(&exe_path)
         .current_dir(&working_dir)
@@ -184,7 +186,33 @@ fn launch_game(app_handle: tauri::AppHandle, exe_path: String, game_id: String) 
     let instant = std::time::Instant::now();
 
     std::thread::spawn(move || {
+        // Wait for the directly-spawned process (may be a launcher that exits quickly)
         let _ = child.wait();
+
+        // Many galgames use a launcher that spawns the real game process and exits
+        // immediately. If the initial process exited in under 30 s, poll for any
+        // process whose exe lives inside the same install directory and keep timing
+        // until they all exit.
+        if instant.elapsed().as_secs() < 30 && install_dir.len() > 5 {
+            // Brief pause so the spawned game process has time to appear in the
+            // process list before we start checking.
+            std::thread::sleep(std::time::Duration::from_secs(3));
+
+            let poll_interval = std::time::Duration::from_secs(2);
+            loop {
+                let sys = sysinfo::System::new_all();
+                let still_running = sys.processes().values().any(|proc| {
+                    proc.exe()
+                        .map(|p| p.to_string_lossy().to_lowercase().starts_with(&install_dir))
+                        .unwrap_or(false)
+                });
+                if !still_running {
+                    break;
+                }
+                std::thread::sleep(poll_interval);
+            }
+        }
+
         let duration_secs = instant.elapsed().as_secs();
         let end_time = chrono::Utc::now().to_rfc3339();
         let _ = app_handle.emit(
