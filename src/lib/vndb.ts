@@ -258,7 +258,7 @@ export function cleanDescription(desc: string | null): string {
     .replace(/\[spoiler\][\s\S]*?\[\/spoiler\]/g, "[剧透内容已隐藏]")
     .replace(/\[raw\]([\s\S]*?)\[\/raw\]/g, "$1")
     .replace(/\[code\]([\s\S]*?)\[\/code\]/g, "$1")
-    .replace(/\[Edited from [^\]]*\]/gi, "")
-    .replace(/\[From [^\]]*\]/gi, "")
+    // .replace(/\[Edited from [^\]]*\]/gi, "")
+    .replace(/\[[^\]]* from [^\]]*\]/gi, "")
     .trim();
 }
