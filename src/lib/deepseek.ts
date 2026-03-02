@@ -6,21 +6,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
 /**
- * Strip VNDB formatting codes from description text before translation.
- */
-function cleanVndbMarkup(text: string): string {
-  return text
-    .replace(/\[url=([^\]]*)\]([^\[]*)\[\/url\]/g, "$2")
-    .replace(/\[spoiler\][\s\S]*?\[\/spoiler\]/g, "")
-    .replace(/\[raw\]([\s\S]*?)\[\/raw\]/g, "$1")
-    .replace(/\[code\]([\s\S]*?)\[\/code\]/g, "$1")
-    .replace(/\[Edited from [^\]]*\]/gi, "")
-    .replace(/\[From [^\]]*\]/gi, "")
-    .trim();
-}
-
-/**
  * Translate a VN description to Chinese using DeepSeek via async-openai.
+ * Caller is responsible for cleaning the text before passing it in.
  */
 export async function translateDescription(
   text: string,
@@ -28,11 +15,8 @@ export async function translateDescription(
 ): Promise<string> {
   if (!text.trim() || !apiKey.trim()) return text;
 
-  const cleaned = cleanVndbMarkup(text);
-  if (!cleaned) return "";
-
   // Truncate very long descriptions to save tokens
-  const truncated = cleaned.length > 3000 ? cleaned.slice(0, 3000) + "..." : cleaned;
+  const truncated = text.length > 3000 ? text.slice(0, 3000) + "..." : text;
 
   const result = await invoke<string>("deepseek_translate", {
     apiKey,

@@ -129,15 +129,16 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
       const descPromise = (async () => {
         if (game.notes) return game.notes;
         if (!selectedVn.description) return "";
+        const cleaned = cleanDescription(selectedVn.description);
         if (apiKey) {
           try {
-            return await translateDescription(selectedVn.description, apiKey);
+            return await translateDescription(cleaned, apiKey);
           } catch (err) {
             toast("warning", `简介翻译失败: ${err}`);
-            return cleanDescription(selectedVn.description);
+            return cleaned;
           }
         }
-        return cleanDescription(selectedVn.description);
+        return cleaned;
       })();
 
       const tagsPromise = (async () => {

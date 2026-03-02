@@ -160,15 +160,16 @@ export function ScanDialog({ onImport, onClose }: Props) {
 
         const descPromise = (async () => {
           if (!vn?.description) return "";
+          const cleaned = cleanDescription(vn.description);
           if (apiKey) {
             try {
-              return await translateDescription(vn.description, apiKey);
+              return await translateDescription(cleaned, apiKey);
             } catch (err) {
               toast("warning", `「${pickDisplayTitle(vn!)}」简介翻译失败: ${err}`);
-              return cleanDescription(vn.description);
+              return cleaned;
             }
           }
-          return cleanDescription(vn.description);
+          return cleaned;
         })();
 
         const tagsPromise = (async () => {
@@ -302,15 +303,16 @@ export function ScanDialog({ onImport, onClose }: Props) {
 
       const descPromise = (async () => {
         if (!fullVn!.description) return "";
+        const cleaned = cleanDescription(fullVn!.description);
         if (apiKey) {
           try {
-            return await translateDescription(fullVn!.description, apiKey);
+            return await translateDescription(cleaned, apiKey);
           } catch (err) {
             toast("warning", `「${pickDisplayTitle(fullVn!)}」简介翻译失败: ${err}`);
-            return cleanDescription(fullVn!.description);
+            return cleaned;
           }
         }
-        return cleanDescription(fullVn!.description);
+        return cleaned;
       })();
 
       const tagsPromise = (async () => {
@@ -403,6 +405,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
 
   const matchedCount = items.filter((i) => i.status === "matched").length;
   const failedCount = items.filter((i) => i.status === "failed").length;
+  const isAnyMatching = items.some((i) => i.status === "matching");
   const activeItem = activeIdx !== null ? items[activeIdx] : null;
   const isReview = phase === "review";
 
@@ -751,10 +754,25 @@ export function ScanDialog({ onImport, onClose }: Props) {
             {isReview && (
               <button
                 onClick={handleImport}
-                className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg transition-colors"
+                disabled={isAnyMatching}
+                className={cn(
+                  "flex items-center gap-2 px-5 py-2 text-white text-sm font-medium rounded-lg transition-colors",
+                  isAnyMatching
+                    ? "bg-accent/50 cursor-not-allowed"
+                    : "bg-accent hover:bg-accent-hover"
+                )}
               >
-                <Check className="w-4 h-4" />
-                确认导入 ({items.length})
+                {isAnyMatching ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    加载中...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    确认导入 ({items.length})
+                  </>
+                )}
               </button>
             )}
 
