@@ -3,35 +3,50 @@ use std::path::{Path, PathBuf};
 use tauri::{Emitter, Manager};
 use walkdir::WalkDir;
 
-/// Known galgame engine signatures: (marker file/pattern, engine name)
+// async-openai 类型在三个 DeepSeek 命令中均用到，统一放顶层
+use async_openai::{
+    config::OpenAIConfig,
+    types::{
+        ChatCompletionRequestSystemMessageArgs,
+        ChatCompletionRequestUserMessageArgs,
+        CreateChatCompletionRequestArgs,
+    },
+    Client as OpenAIClient,
+};
+
+// ─── 引擎识别 ────────────────────────────────────────────────
+
+/// 已知 galgame 引擎的特征文件：(文件名, 引擎名)
 const ENGINE_SIGNATURES: &[(&str, &str)] = &[
-    ("data.xp3", "KiriKiri"),
-    ("data.xp4", "KiriKiri"),
-    ("arc.nsa", "NScripter"),
-    ("arc1.nsa", "NScripter"),
-    ("nscript.dat", "NScripter"),
-    ("BGI.exe", "BGI/Ethornell"),
-    ("Majiro.arc", "Majiro"),
-    ("rio.arc", "Liar-soft"),
-    ("UnityPlayer.dll", "Unity"),
+    ("data.xp3",         "KiriKiri"),
+    ("data.xp4",         "KiriKiri"),
+    ("arc.nsa",          "NScripter"),
+    ("arc1.nsa",         "NScripter"),
+    ("nscript.dat",      "NScripter"),
+    ("BGI.exe",          "BGI/Ethornell"),
+    ("Majiro.arc",       "Majiro"),
+    ("rio.arc",          "Liar-soft"),
+    ("UnityPlayer.dll",  "Unity"),
     ("GameAssembly.dll", "Unity/IL2CPP"),
-    ("AdvHD.exe", "WillPlus AdvHD"),
+    ("AdvHD.exe",        "WillPlus AdvHD"),
     ("SiglusEngine.exe", "SiglusEngine"),
-    ("RealLive.exe", "RealLive"),
-    ("AGERC.DLL", "AGE"),
-    ("CatSystem2.exe", "CatSystem2"),
-    ("cg.mpk", "Malie"),
-    ("start.meg", "Artemis"),
+    ("RealLive.exe",     "RealLive"),
+    ("AGERC.DLL",        "AGE"),
+    ("CatSystem2.exe",   "CatSystem2"),
+    ("cg.mpk",           "Malie"),
+    ("start.meg",        "Artemis"),
 ];
 
-/// Exe filenames to exclude (installers, uninstallers, redistributables)
+/// 需要排除的 exe 文件名（安装程序、卸载程序、运行时等）
 const EXE_BLACKLIST: &[&str] = &[
     "unins000", "uninstall", "setup", "install", "config",
     "setting", "updater", "launcher", "crash", "vc_redist",
     "dxsetup", "dxwebsetup", "dotnetfx",
 ];
 
-/// Detected game info returned from scanning
+// ─── 游戏扫描 ────────────────────────────────────────────────
+
+/// 扫描结果：从文件夹中检测到的游戏信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectedGame {
     pub title: String,
@@ -40,108 +55,65 @@ pub struct DetectedGame {
     pub engine: Option<String>,
 }
 
-/// Score an exe path to determine the best game executable.
-/// Higher score = more preferred.
-///
-/// Priority:
-///   1. Path contains "chs" → highest (Chinese Simplified)
-///   2. Path contains "cn"/"chinese"/"zh" → high
-///   3. Exe name matches directory name → likely main game
-///   4. Larger file size → main exe usually bigger than tools
-///   Blacklisted names → heavy penalty
+/// 对候选 exe 路径打分，分数越高越可能是主游戏程序。
+/// 优先级：汉化版路径 > 文件名匹配目录名 > 文件体积
 fn score_exe(exe: &Path, dir_name: &str) -> i64 {
     let full_lower = exe.to_string_lossy().to_lowercase();
-    let stem = exe
-        .file_stem()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_lowercase();
+    let stem = exe.file_stem().unwrap_or_default().to_string_lossy().to_lowercase();
 
-    for bl in EXE_BLACKLIST {
-        if stem.contains(bl) {
-            return -1_000_000;
-        }
+    // 黑名单直接淘汰
+    if EXE_BLACKLIST.iter().any(|bl| stem.contains(bl)) {
+        return -1_000_000;
     }
 
     let mut score: i64 = 0;
 
-    // Priority 1: path contains "chs"
-    if full_lower.contains("chs") {
-        score += 100_000;
-    }
-    // Priority 1.5: other Chinese indicators
-    if full_lower.contains("_cn")
-        || full_lower.contains("chinese")
-        || full_lower.contains("\\zh\\")
-        || full_lower.contains("/zh/")
+    // 汉化标记加分
+    if full_lower.contains("chs") { score += 100_000; }
+    if full_lower.contains("_cn") || full_lower.contains("chinese")
+        || full_lower.contains("\\zh\\") || full_lower.contains("/zh/")
     {
         score += 50_000;
     }
 
-    // Priority 2: exe name matches directory name
-    let dir_lower = dir_name.to_lowercase();
-    if !dir_lower.is_empty() && stem.contains(&dir_lower) {
+    // exe 名与目录名匹配
+    if !dir_name.is_empty() && stem.contains(&dir_name.to_lowercase()) {
         score += 10_000;
     }
 
-    // Priority 3: file size
+    // 文件体积（最多 9999 分，避免压过前两项）
     let size = std::fs::metadata(exe).map(|m| m.len()).unwrap_or(0);
     score += std::cmp::min(size / 1024, 9999) as i64;
 
     score
 }
 
-/// Detect a single game from a folder.
-/// The folder itself IS the game directory.
+/// 从单个文件夹检测游戏，扫描深度 2 层（覆盖 chs/、bin/ 等子目录）
 fn detect_game_from_folder(folder: &Path) -> Option<DetectedGame> {
-    if !folder.is_dir() {
-        return None;
-    }
+    if !folder.is_dir() { return None; }
 
-    let dir_name = folder
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-
+    let dir_name = folder.file_name().unwrap_or_default().to_string_lossy().to_string();
     let mut exe_files: Vec<PathBuf> = Vec::new();
     let mut detected_engine: Option<String> = None;
 
-    // Walk up to 2 levels (catches "chs/game.exe", "bin/game.exe", etc.)
-    for item in WalkDir::new(folder)
-        .max_depth(2)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        let item_path = item.path();
-        let fname = item_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .to_string();
+    for item in WalkDir::new(folder).max_depth(2).into_iter().filter_map(|e| e.ok()) {
+        let path = item.path();
+        let fname = path.file_name().unwrap_or_default().to_string_lossy();
 
+        // 识别引擎
         for (sig, engine) in ENGINE_SIGNATURES {
             if fname.eq_ignore_ascii_case(sig) {
                 detected_engine = Some(engine.to_string());
             }
         }
 
-        if let Some(ext) = item_path.extension() {
-            if ext.eq_ignore_ascii_case("exe") {
-                exe_files.push(item_path.to_path_buf());
-            }
+        // 收集 exe
+        if path.extension().map(|e| e.eq_ignore_ascii_case("exe")).unwrap_or(false) {
+            exe_files.push(path.to_path_buf());
         }
     }
 
-    if exe_files.is_empty() {
-        return None;
-    }
-
-    let best_exe = exe_files
-        .iter()
-        .max_by_key(|p| score_exe(p, &dir_name))
-        .cloned()
-        .unwrap_or_else(|| exe_files[0].clone());
+    let best_exe = exe_files.iter().max_by_key(|p| score_exe(p, &dir_name))?.clone();
 
     Some(DetectedGame {
         title: dir_name,
@@ -151,139 +123,15 @@ fn detect_game_from_folder(folder: &Path) -> Option<DetectedGame> {
     })
 }
 
-// ─── Tauri Commands ────────────────────────────────────────────
+// ─── 代理工具 ────────────────────────────────────────────────
 
-/// Detect games from a list of folder paths.
-/// Each folder is treated as one game.
-#[tauri::command]
-fn scan_games(paths: Vec<String>) -> Result<Vec<DetectedGame>, String> {
-    let mut games: Vec<DetectedGame> = Vec::new();
-    for path_str in &paths {
-        let path = Path::new(path_str);
-        if !path.exists() {
-            continue;
-        }
-        if let Some(game) = detect_game_from_folder(path) {
-            games.push(game);
-        }
-    }
-    Ok(games)
-}
-
-#[tauri::command]
-fn launch_game(app_handle: tauri::AppHandle, exe_path: String, game_id: String) -> Result<(), String> {
-    let path = Path::new(&exe_path);
-    let working_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
-    // Normalise to lowercase for case-insensitive comparison on Windows
-    let install_dir = working_dir.to_string_lossy().to_lowercase();
-
-    let mut child = std::process::Command::new(&exe_path)
-        .current_dir(&working_dir)
-        .spawn()
-        .map_err(|e| format!("Failed to launch game: {}", e))?;
-
-    let start_time = chrono::Utc::now().to_rfc3339();
-    let instant = std::time::Instant::now();
-
-    std::thread::spawn(move || {
-        // Wait for the directly-spawned process (may be a launcher that exits quickly)
-        let _ = child.wait();
-
-        // Many galgames use a launcher that spawns the real game process and exits
-        // immediately. If the initial process exited in under 30 s, poll for any
-        // process whose exe lives inside the same install directory and keep timing
-        // until they all exit.
-        if instant.elapsed().as_secs() < 30 && install_dir.len() > 5 {
-            // Brief pause so the spawned game process has time to appear in the
-            // process list before we start checking.
-            std::thread::sleep(std::time::Duration::from_secs(3));
-
-            let poll_interval = std::time::Duration::from_secs(2);
-            loop {
-                let sys = sysinfo::System::new_all();
-                let still_running = sys.processes().values().any(|proc| {
-                    proc.exe()
-                        .map(|p| p.to_string_lossy().to_lowercase().starts_with(&install_dir))
-                        .unwrap_or(false)
-                });
-                if !still_running {
-                    break;
-                }
-                std::thread::sleep(poll_interval);
-            }
-        }
-
-        let duration_secs = instant.elapsed().as_secs();
-        let end_time = chrono::Utc::now().to_rfc3339();
-        let _ = app_handle.emit(
-            "playtime_session_ended",
-            serde_json::json!({
-                "game_id": game_id,
-                "start_time": start_time,
-                "end_time": end_time,
-                "duration": duration_secs,
-            }),
-        );
-    });
-
-    Ok(())
-}
-
-#[tauri::command]
-fn open_folder(path: String) -> Result<(), String> {
-    std::process::Command::new("explorer")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| format!("Failed to open folder: {}", e))?;
-    Ok(())
-}
-
-#[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
-    std::process::Command::new("cmd")
-        .args(["/C", "start", "", &url])
-        .spawn()
-        .map_err(|e| format!("Failed to open URL: {}", e))?;
-    Ok(())
-}
-
-#[tauri::command]
-fn get_folder_size(path: String) -> Result<u64, String> {
-    let mut total: u64 = 0;
-    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
-        if entry.file_type().is_file() {
-            total += entry.metadata().map(|m| m.len()).unwrap_or(0);
-        }
-    }
-    Ok(total)
-}
-
-#[tauri::command]
-fn find_save_directories(install_path: String) -> Result<Vec<String>, String> {
-    let root = Path::new(&install_path);
-    let common_save_dirs = [
-        "save", "savedata", "Save", "SaveData", "saves", "Saves", "data",
-    ];
-    let mut found: Vec<String> = Vec::new();
-    for name in &common_save_dirs {
-        let candidate = root.join(name);
-        if candidate.is_dir() {
-            found.push(candidate.to_string_lossy().to_string());
-        }
-    }
-    Ok(found)
-}
-
-/// Parse a Windows ProxyServer registry value into an http:// URL.
-/// Handles formats: "127.0.0.1:7890", "http://127.0.0.1:7890",
-/// and per-protocol "http=127.0.0.1:7890;https=127.0.0.1:7890".
+/// 解析 Windows ProxyServer 注册表值为 http:// URL。
+/// 支持三种格式：纯 host:port、带 scheme 的 URL、以及 http=host:port;https=host:port。
 #[cfg(target_os = "windows")]
 fn parse_windows_proxy_server(proxy_server: &str) -> Option<String> {
-    if proxy_server.is_empty() {
-        return None;
-    }
-    // Per-protocol format
+    if proxy_server.is_empty() { return None; }
     if proxy_server.contains('=') {
+        // 多协议格式，优先取 https，再取 http
         for proto in &["https", "http"] {
             let prefix = format!("{}=", proto);
             for part in proxy_server.split(';') {
@@ -294,61 +142,201 @@ fn parse_windows_proxy_server(proxy_server: &str) -> Option<String> {
         }
         return None;
     }
-    // Already has scheme
     if proxy_server.starts_with("http://") || proxy_server.starts_with("https://") {
         return Some(proxy_server.to_string());
     }
-    // Plain host:port
     Some(format!("http://{}", proxy_server))
 }
 
-/// Detect the Windows system proxy (HKCU Internet Settings).
-/// Returns None if proxy is disabled or not configured.
+/// 读取 Windows 系统代理设置（HKCU Internet Settings）
 #[cfg(target_os = "windows")]
 fn detect_windows_system_proxy() -> Option<String> {
-    use winreg::enums::HKEY_CURRENT_USER;
-    use winreg::RegKey;
-    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let settings = hkcu
+    use winreg::{enums::HKEY_CURRENT_USER, RegKey};
+    let settings = RegKey::predef(HKEY_CURRENT_USER)
         .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings")
         .ok()?;
     let enabled: u32 = settings.get_value("ProxyEnable").ok()?;
-    if enabled == 0 {
-        return None;
-    }
-    let server: String = settings.get_value("ProxyServer").ok()?;
-    parse_windows_proxy_server(&server)
+    if enabled == 0 { return None; }
+    parse_windows_proxy_server(&settings.get_value::<String, _>("ProxyServer").ok()?)
 }
 
-/// Build a reqwest Client that routes through the given proxy URL.
-/// Priority: explicit proxy_url > HTTPS_PROXY/HTTP_PROXY env vars (reqwest default)
-///           > Windows system proxy (registry) > no proxy.
+/// 构建带代理的 HTTP 客户端。
+/// 优先级：显式 proxy_url > 环境变量 > Windows 系统代理 > 无代理
 fn build_proxy_client(proxy_url: &str) -> Result<reqwest::Client, String> {
     let mut builder = reqwest::Client::builder();
+
     if !proxy_url.is_empty() {
-        // Explicit proxy from app settings
         let proxy = reqwest::Proxy::all(proxy_url)
-            .map_err(|e| format!("Invalid proxy URL: {}", e))?;
+            .map_err(|e| format!("代理地址无效: {}", e))?;
         builder = builder.proxy(proxy);
     } else {
-        // Fall back to Windows system proxy when no env vars are set
+        // 无显式代理时，尝试自动读取 Windows 系统代理（仅在未设置环境变量时）
         #[cfg(target_os = "windows")]
-        if std::env::var("HTTPS_PROXY")
-            .or_else(|_| std::env::var("HTTP_PROXY"))
-            .map(|v| v.is_empty())
-            .unwrap_or(true)
+        if std::env::var("HTTPS_PROXY").or_else(|_| std::env::var("HTTP_PROXY"))
+            .map(|v| v.is_empty()).unwrap_or(true)
         {
-            if let Some(sys_proxy) = detect_windows_system_proxy() {
-                if let Ok(proxy) = reqwest::Proxy::all(&sys_proxy) {
-                    builder = builder.proxy(proxy);
+            if let Some(sys) = detect_windows_system_proxy() {
+                if let Ok(p) = reqwest::Proxy::all(&sys) {
+                    builder = builder.proxy(p);
                 }
             }
         }
     }
-    builder.build().map_err(|e| format!("Failed to build HTTP client: {}", e))
+
+    builder.build().map_err(|e| format!("HTTP 客户端创建失败: {}", e))
 }
 
-/// Download a cover image from URL and save to app data covers directory.
+/// 构建 DeepSeek API 客户端，强制绕过代理（避免代理证书干扰 API 调用）
+fn build_deepseek_client(api_key: &str) -> Result<OpenAIClient<OpenAIConfig>, String> {
+    let config = OpenAIConfig::new()
+        .with_api_key(api_key)
+        .with_api_base("https://api.deepseek.com/v1");
+    let http = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("HTTP 客户端创建失败: {}", e))?;
+    Ok(OpenAIClient::with_config(config).with_http_client(http))
+}
+
+// ─── 图片下载 ────────────────────────────────────────────────
+
+/// 下载单张图片到指定目录；若文件已存在则直接返回路径（幂等）
+async fn download_to_dir(
+    dir: PathBuf,
+    url: &str,
+    filename: &str,
+    proxy_url: &str,
+) -> Result<String, String> {
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("创建目录失败: {}", e))?;
+
+    let dest = dir.join(filename);
+    if dest.exists() {
+        return Ok(dest.to_string_lossy().to_string());
+    }
+
+    let bytes = build_proxy_client(proxy_url)?
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("下载请求失败: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("HTTP 错误: {}", e))?
+        .bytes()
+        .await
+        .map_err(|e| format!("读取响应失败: {}", e))?;
+
+    std::fs::write(&dest, &bytes)
+        .map_err(|e| format!("写入文件失败: {}", e))?;
+
+    Ok(dest.to_string_lossy().to_string())
+}
+
+// ─── Tauri 命令 ──────────────────────────────────────────────
+
+/// 扫描多个文件夹，每个文件夹识别为一个游戏
+#[tauri::command]
+fn scan_games(paths: Vec<String>) -> Result<Vec<DetectedGame>, String> {
+    let games = paths.iter()
+        .filter_map(|p| detect_game_from_folder(Path::new(p)))
+        .collect();
+    Ok(games)
+}
+
+/// 启动游戏并记录游玩时间。
+/// 支持"启动器模式"：若主进程在 30 秒内退出，继续轮询安装目录下的子进程，
+/// 直到所有相关进程退出后再上报本次游玩时长。
+#[tauri::command]
+fn launch_game(
+    app_handle: tauri::AppHandle,
+    exe_path: String,
+    game_id: String,
+) -> Result<(), String> {
+    let path = Path::new(&exe_path);
+    let working_dir = path.parent().unwrap_or(Path::new(".")).to_path_buf();
+    let install_dir = working_dir.to_string_lossy().to_lowercase();
+
+    let mut child = std::process::Command::new(&exe_path)
+        .current_dir(&working_dir)
+        .spawn()
+        .map_err(|e| format!("启动失败: {}", e))?;
+
+    let start_time = chrono::Utc::now().to_rfc3339();
+    let instant = std::time::Instant::now();
+
+    std::thread::spawn(move || {
+        let _ = child.wait();
+
+        // 若主进程 30 秒内就退出（通常是启动器），轮询安装目录下的实际游戏进程
+        if instant.elapsed().as_secs() < 30 && install_dir.len() > 5 {
+            std::thread::sleep(std::time::Duration::from_secs(3));
+            loop {
+                let still_running = sysinfo::System::new_all()
+                    .processes()
+                    .values()
+                    .any(|p| {
+                        p.exe()
+                            .map(|e| e.to_string_lossy().to_lowercase().starts_with(&install_dir))
+                            .unwrap_or(false)
+                    });
+                if !still_running { break; }
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
+        }
+
+        let _ = app_handle.emit("playtime_session_ended", serde_json::json!({
+            "game_id":    game_id,
+            "start_time": start_time,
+            "end_time":   chrono::Utc::now().to_rfc3339(),
+            "duration":   instant.elapsed().as_secs(),
+        }));
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+fn open_folder(path: String) -> Result<(), String> {
+    std::process::Command::new("explorer")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| format!("打开目录失败: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    std::process::Command::new("cmd")
+        .args(["/C", "start", "", &url])
+        .spawn()
+        .map_err(|e| format!("打开链接失败: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn get_folder_size(path: String) -> Result<u64, String> {
+    let total = WalkDir::new(&path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.metadata().map(|m| m.len()).unwrap_or(0))
+        .sum();
+    Ok(total)
+}
+
+#[tauri::command]
+fn find_save_directories(install_path: String) -> Result<Vec<String>, String> {
+    let root = Path::new(&install_path);
+    let candidates = ["save", "savedata", "Save", "SaveData", "saves", "Saves", "data"];
+    let found = candidates.iter()
+        .map(|name| root.join(name))
+        .filter(|p| p.is_dir())
+        .map(|p| p.to_string_lossy().to_string())
+        .collect();
+    Ok(found)
+}
+
+/// 下载封面图到 covers 目录
 #[tauri::command]
 async fn download_cover(
     app_handle: tauri::AppHandle,
@@ -356,44 +344,13 @@ async fn download_cover(
     filename: String,
     proxy_url: String,
 ) -> Result<String, String> {
-    let app_data = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    let covers_dir = app_data.join("covers");
-    std::fs::create_dir_all(&covers_dir)
-        .map_err(|e| format!("Failed to create covers dir: {}", e))?;
-
-    let dest = covers_dir.join(&filename);
-
-    // Skip if already downloaded
-    if dest.exists() {
-        return Ok(dest.to_string_lossy().to_string());
-    }
-
-    let client = build_proxy_client(&proxy_url)?;
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to download image: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("HTTP error: {}", response.status()));
-    }
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to read response: {}", e))?;
-
-    std::fs::write(&dest, &bytes)
-        .map_err(|e| format!("Failed to save image: {}", e))?;
-
-    Ok(dest.to_string_lossy().to_string())
+    let dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?
+        .join("covers");
+    download_to_dir(dir, &url, &filename, &proxy_url).await
 }
 
-/// Download a screenshot image from URL and save to app data screenshots directory.
+/// 下载截图到 screenshots 目录
 #[tauri::command]
 async fn download_screenshot(
     app_handle: tauri::AppHandle,
@@ -401,217 +358,97 @@ async fn download_screenshot(
     filename: String,
     proxy_url: String,
 ) -> Result<String, String> {
-    let app_data = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    let screenshots_dir = app_data.join("screenshots");
-    std::fs::create_dir_all(&screenshots_dir)
-        .map_err(|e| format!("Failed to create screenshots dir: {}", e))?;
-
-    let dest = screenshots_dir.join(&filename);
-
-    // Skip if already downloaded
-    if dest.exists() {
-        return Ok(dest.to_string_lossy().to_string());
-    }
-
-    let client = build_proxy_client(&proxy_url)?;
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to download screenshot: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("HTTP error: {}", response.status()));
-    }
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Failed to read response: {}", e))?;
-
-    std::fs::write(&dest, &bytes)
-        .map_err(|e| format!("Failed to save screenshot: {}", e))?;
-
-    Ok(dest.to_string_lossy().to_string())
+    let dir = app_handle.path().app_data_dir()
+        .map_err(|e| format!("获取数据目录失败: {}", e))?
+        .join("screenshots");
+    download_to_dir(dir, &url, &filename, &proxy_url).await
 }
 
-/// Translate text using DeepSeek API (OpenAI-compatible) via async-openai.
+/// 使用 DeepSeek 将视觉小说简介翻译为简体中文
 #[tauri::command]
 async fn deepseek_translate(api_key: String, text: String) -> Result<String, String> {
-    use async_openai::{
-        config::OpenAIConfig,
-        types::{
-            ChatCompletionRequestSystemMessageArgs,
-            ChatCompletionRequestUserMessageArgs,
-            CreateChatCompletionRequestArgs,
-        },
-        Client,
-    };
+    let client = build_deepseek_client(&api_key)?;
 
-    let config = OpenAIConfig::new()
-        .with_api_key(&api_key)
-        .with_api_base("https://api.deepseek.com/v1");
-
-    let http_client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
-    let client = Client::with_config(config).with_http_client(http_client);
-
-    let request = CreateChatCompletionRequestArgs::default()
+    let req = CreateChatCompletionRequestArgs::default()
         .model("deepseek-chat")
         .temperature(0.3)
         .max_tokens(2048u32)
         .messages(vec![
             ChatCompletionRequestSystemMessageArgs::default()
-                .content("你是一个专业的游戏简介翻译器。将以下视觉小说(Visual Novel)的简介翻译成自然流畅的简体中文。保持原文的语气和风格，不要添加任何额外的说明或注释。如果原文已经是中文，请直接返回原文。")
-                .build()
-                .map_err(|e| e.to_string())?
-                .into(),
+                .content("你是专业游戏简介翻译器。将视觉小说简介翻译成自然流畅的简体中文，保持原文语气，不添加说明。原文已是中文则直接返回。")
+                .build().map_err(|e| e.to_string())?.into(),
             ChatCompletionRequestUserMessageArgs::default()
-                .content(text.clone())
-                .build()
-                .map_err(|e| e.to_string())?
-                .into(),
+                .content(text)
+                .build().map_err(|e| e.to_string())?.into(),
         ])
-        .build()
-        .map_err(|e| format!("Failed to build request: {}", e))?;
+        .build().map_err(|e| e.to_string())?;
 
-    let response = client
-        .chat()
-        .create(request)
-        .await
-        .map_err(|e| format!("DeepSeek API error: {}", e))?;
+    let resp = client.chat().create(req).await
+        .map_err(|e| format!("DeepSeek 请求失败: {}", e))?;
 
-    let content = response
-        .choices
-        .first()
+    resp.choices.first()
         .and_then(|c| c.message.content.clone())
-        .unwrap_or_default()
-        .trim()
-        .to_string();
-
-    if content.is_empty() {
-        return Err("DeepSeek returned empty response".to_string());
-    }
-
-    Ok(content)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| "DeepSeek 返回空响应".to_string())
 }
 
-/// Test DeepSeek API key validity.
+/// 发送最小请求验证 API Key 是否有效
 #[tauri::command]
 async fn deepseek_test(api_key: String) -> Result<bool, String> {
-    use async_openai::{
-        config::OpenAIConfig,
-        types::{
-            ChatCompletionRequestUserMessageArgs,
-            CreateChatCompletionRequestArgs,
-        },
-        Client,
-    };
+    let client = build_deepseek_client(&api_key)?;
 
-    let config = OpenAIConfig::new()
-        .with_api_key(&api_key)
-        .with_api_base("https://api.deepseek.com/v1");
-
-    let http_client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
-    let client = Client::with_config(config).with_http_client(http_client);
-
-    let request = CreateChatCompletionRequestArgs::default()
+    let req = CreateChatCompletionRequestArgs::default()
         .model("deepseek-chat")
         .max_tokens(1u32)
         .messages(vec![
             ChatCompletionRequestUserMessageArgs::default()
                 .content("Hi")
-                .build()
-                .map_err(|e| e.to_string())?
-                .into(),
+                .build().map_err(|e| e.to_string())?.into(),
         ])
-        .build()
-        .map_err(|e| format!("Failed to build request: {}", e))?;
+        .build().map_err(|e| e.to_string())?;
 
-    match client.chat().create(request).await {
-        Ok(_) => Ok(true),
-        Err(_) => Ok(false),
-    }
+    Ok(client.chat().create(req).await.is_ok())
 }
 
-/// Match VNDB English tags against a user-defined set of Chinese genre tags.
-/// Returns only the genre tags that apply to this game (zero or more).
+/// 将 VNDB 英文标签与用户配置的类型标签库匹配，返回适用的标签（零个或多个）
 #[tauri::command]
 async fn deepseek_match_tags(
     api_key: String,
     vndb_tags: Vec<String>,
     genre_tags: Vec<String>,
 ) -> Result<Vec<String>, String> {
-    use async_openai::{
-        config::OpenAIConfig,
-        types::{
-            ChatCompletionRequestSystemMessageArgs,
-            ChatCompletionRequestUserMessageArgs,
-            CreateChatCompletionRequestArgs,
-        },
-        Client,
-    };
-
     if vndb_tags.is_empty() || genre_tags.is_empty() || api_key.is_empty() {
         return Ok(vec![]);
     }
 
-    let config = OpenAIConfig::new()
-        .with_api_key(&api_key)
-        .with_api_base("https://api.deepseek.com/v1");
+    let client = build_deepseek_client(&api_key)?;
 
-    let http_client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
-    let client = Client::with_config(config).with_http_client(http_client);
-
-    let vndb_list = vndb_tags.join(", ");
-    let genre_list = genre_tags.join("、");
-
-    let request = CreateChatCompletionRequestArgs::default()
+    let req = CreateChatCompletionRequestArgs::default()
         .model("deepseek-chat")
         .temperature(0.0)
         .max_tokens(256u32)
         .messages(vec![
             ChatCompletionRequestSystemMessageArgs::default()
-                .content("你是一个视觉小说分类专家。根据给定的VNDB英文标签，从可用类型标签中选出真正适合这部作品的标签，以JSON数组格式输出。没有匹配则输出[]。只输出JSON数组，不要任何其他内容。")
-                .build()
-                .map_err(|e| e.to_string())?
-                .into(),
+                .content("你是视觉小说分类专家。根据给定的VNDB英文标签，从可用类型标签中选出适合这部作品的标签，以JSON数组格式输出。没有匹配则输出[]。只输出JSON数组。")
+                .build().map_err(|e| e.to_string())?.into(),
             ChatCompletionRequestUserMessageArgs::default()
                 .content(format!(
                     "VNDB标签：{}\n可用类型标签：{}\n\n输出适合的类型标签（JSON数组）：",
-                    vndb_list, genre_list
+                    vndb_tags.join(", "),
+                    genre_tags.join("、"),
                 ))
-                .build()
-                .map_err(|e| e.to_string())?
-                .into(),
+                .build().map_err(|e| e.to_string())?.into(),
         ])
-        .build()
-        .map_err(|e| format!("Failed to build request: {}", e))?;
+        .build().map_err(|e| e.to_string())?;
 
-    let response = client
-        .chat()
-        .create(request)
-        .await
-        .map_err(|e| format!("DeepSeek API error: {}", e))?;
-
-    let raw = response
-        .choices
-        .first()
+    let raw = client.chat().create(req).await
+        .map_err(|e| format!("DeepSeek 请求失败: {}", e))?
+        .choices.first()
         .and_then(|c| c.message.content.clone())
         .unwrap_or_default();
 
-    // Extract JSON array from response (tolerate extra text/markdown)
+    // 从响应中提取 JSON 数组（兼容 markdown 代码块等多余格式）
     let json_str = match (raw.find('['), raw.rfind(']')) {
         (Some(s), Some(e)) if e > s => &raw[s..=e],
         _ => "[]",
@@ -619,18 +456,12 @@ async fn deepseek_match_tags(
 
     let matched: Vec<String> = serde_json::from_str(json_str).unwrap_or_default();
 
-    // Validate: only return tags that exist in genre_tags
-    let genre_set: std::collections::HashSet<&str> =
-        genre_tags.iter().map(|s| s.as_str()).collect();
-    let validated: Vec<String> = matched
-        .into_iter()
-        .filter(|t| genre_set.contains(t.as_str()))
-        .collect();
-
-    Ok(validated)
+    // 白名单过滤：剔除不在 genre_tags 中的标签，防止 AI 幻觉
+    let genre_set: std::collections::HashSet<&str> = genre_tags.iter().map(|s| s.as_str()).collect();
+    Ok(matched.into_iter().filter(|t| genre_set.contains(t.as_str())).collect())
 }
 
-// ─── App Entry ─────────────────────────────────────────────────
+// ─── 应用入口 ────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -653,5 +484,5 @@ pub fn run() {
             deepseek_match_tags,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .expect("Tauri 应用启动失败");
 }

@@ -18,7 +18,6 @@ import {
   getVnById,
   extractTags,
   formatVndbDate,
-  vndbRatingToLocal,
   cleanDescription,
   pickDisplayTitle,
   pickOriginalTitle,
@@ -427,18 +426,18 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                   )}
                 </div>
 
-                {/* Tags preview */}
+                {/* VNDB 原始标签（供参考；实际导入标签由 DeepSeek 从标签库匹配） */}
                 {selectedVn.tags && selectedVn.tags.length > 0 && (
                   <div>
                     <span className="text-xs text-text-muted flex items-center gap-1 mb-1.5">
                       <Tag className="w-3 h-3" />
-                      将导入的标签
+                      VNDB 标签（仅供参考）
                     </span>
                     <div className="flex flex-wrap gap-1">
                       {extractTags(selectedVn.tags).map((tag) => (
                         <span
                           key={tag}
-                          className="px-2 py-0.5 bg-accent/10 text-accent text-[10px] rounded-full"
+                          className="px-2 py-0.5 bg-surface-3 text-text-muted text-[10px] rounded-full"
                         >
                           {tag}
                         </span>

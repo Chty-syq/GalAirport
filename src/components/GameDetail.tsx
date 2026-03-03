@@ -225,19 +225,20 @@ export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbM
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="mt-6 flex gap-3">
-            {onVndbMatch && (
+          {/* VNDB 匹配按钮（仅在有回调时显示） */}
+          {onVndbMatch && (
+            <div className="mt-6 flex gap-3">
               <button
                 onClick={() => onVndbMatch(game)}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium text-sm transition-colors"
               >
                 <Globe className="w-4 h-4" /> VNDB 自动匹配
               </button>
-            )}
-          </div>
+            </div>
+          )}
 
-          <div className="mt-3 flex gap-3">
+          {/* 操作按钮 */}
+          <div className={cn(onVndbMatch ? "mt-3" : "mt-6", "flex gap-3")}>
             <button
               onClick={openFolder}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 hover:bg-surface-4 text-text-primary rounded-lg text-sm transition-colors"
