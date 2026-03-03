@@ -27,7 +27,7 @@ import {
   pickOriginalTitle,
   type VndbVn,
 } from "@/lib/vndb";
-import { translateDescription, translateTags } from "@/lib/deepseek";
+import { translateDescription, matchGenreTags } from "@/lib/deepseek";
 import * as db from "@/lib/database";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
@@ -117,9 +117,12 @@ export function ScanDialog({ onImport, onClose }: Props) {
     if (items.length === 0) return;
     setPhase("matching");
 
-    // Pre-fetch API key and proxy URL once (avoid repeated DB reads)
-    const apiKey = await db.getSetting("deepseek_api_key");
-    const proxyUrl = await db.getSetting("proxy_url");
+    // Pre-fetch settings once (avoid repeated DB reads)
+    const [apiKey, proxyUrl, genreTags] = await Promise.all([
+      db.getSetting("deepseek_api_key"),
+      db.getSetting("proxy_url"),
+      db.getGenreTags(),
+    ]);
 
     const total = items.length;
     const CONCURRENCY = 5;
@@ -199,16 +202,14 @@ export function ScanDialog({ onImport, onClose }: Props) {
         })();
 
         const tagsPromise = (async () => {
-          if (!vn) return [];
+          if (!vn || !apiKey) return [];
           const vndbTags = extractTags(vn.tags || []);
-          if (apiKey && vndbTags.length > 0) {
-            try {
-              return await translateTags(vndbTags, apiKey);
-            } catch {
-              return vndbTags;
-            }
+          if (!vndbTags.length) return [];
+          try {
+            return await matchGenreTags(vndbTags, genreTags, apiKey);
+          } catch {
+            return [];
           }
-          return vndbTags;
         })();
 
         const [coverPath, screenshotPaths, translatedDesc, translatedTags] = await Promise.all([
@@ -322,9 +323,10 @@ export function ScanDialog({ onImport, onClose }: Props) {
         prev.map((it, idx) => (idx === targetIdx ? { ...it, vndb: fullVn! } : it))
       );
 
-      const [apiKey, proxyUrl] = await Promise.all([
+      const [apiKey, proxyUrl, genreTags] = await Promise.all([
         db.getSetting("deepseek_api_key"),
         db.getSetting("proxy_url"),
+        db.getGenreTags(),
       ]);
 
       const coverPromise = (async () => {
@@ -372,15 +374,14 @@ export function ScanDialog({ onImport, onClose }: Props) {
       })();
 
       const tagsPromise = (async () => {
+        if (!apiKey) return [];
         const vndbTags = extractTags(fullVn!.tags || []);
-        if (apiKey && vndbTags.length > 0) {
-          try {
-            return await translateTags(vndbTags, apiKey);
-          } catch {
-            return vndbTags;
-          }
+        if (!vndbTags.length) return [];
+        try {
+          return await matchGenreTags(vndbTags, genreTags, apiKey);
+        } catch {
+          return [];
         }
-        return vndbTags;
       })();
 
       const [coverPath, screenshotPaths, translatedDesc, translatedTags] = await Promise.all([
@@ -428,9 +429,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
           ? vn.developers.map((d) => d.name).join(", ")
           : "";
 
-      // Use translated tags if available, otherwise English originals
-      const vndbTags = vn ? extractTags(vn.tags || []) : [];
-      const allTags = item.translatedTags.length > 0 ? item.translatedTags : vndbTags;
+      const allTags = item.translatedTags;
 
       return {
         title: vn ? pickDisplayTitle(vn) : item.detected.title,

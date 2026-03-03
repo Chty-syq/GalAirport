@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
-import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Trash2, Save, Palette, Check } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw } from "lucide-react";
 import * as db from "@/lib/database";
-import type { TagTranslation } from "@/lib/database";
 import { testApiKey } from "@/lib/deepseek";
 import { useTheme, THEME_LIST } from "@/hooks/useTheme";
 
@@ -21,12 +20,11 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const [testResult, setTestResult] = useState<"success" | "fail" | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Tag translations state
-  const [tagList, setTagList] = useState<TagTranslation[]>([]);
+  // Genre tag library state
+  const [genreTags, setGenreTagsState] = useState<string[]>([]);
   const [tagLoading, setTagLoading] = useState(false);
-  const [editedTags, setEditedTags] = useState<Map<string, string>>(new Map());
-  const [tagFilter, setTagFilter] = useState("");
-  const [tagSaving, setTagSaving] = useState(false);
+  const [newTagInput, setNewTagInput] = useState("");
+  const newTagRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -38,19 +36,35 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
     })();
   }, []);
 
-  // Load tags when switching to tags tab
   useEffect(() => {
     if (tab === "tags") {
-      loadTags();
+      setTagLoading(true);
+      db.getGenreTags().then((tags) => {
+        setGenreTagsState(tags);
+        setTagLoading(false);
+      });
     }
   }, [tab]);
 
-  const loadTags = async () => {
-    setTagLoading(true);
-    const tags = await db.getAllTagTranslations();
-    setTagList(tags);
-    setEditedTags(new Map());
-    setTagLoading(false);
+  const saveGenreTags = async (tags: string[]) => {
+    setGenreTagsState(tags);
+    await db.setGenreTags(tags);
+  };
+
+  const handleAddTag = async () => {
+    const val = newTagInput.trim();
+    if (!val || genreTags.includes(val)) return;
+    await saveGenreTags([...genreTags, val]);
+    setNewTagInput("");
+    newTagRef.current?.focus();
+  };
+
+  const handleRemoveTag = async (tag: string) => {
+    await saveGenreTags(genreTags.filter((t) => t !== tag));
+  };
+
+  const handleResetTags = async () => {
+    await saveGenreTags(db.DEFAULT_GENRE_TAGS);
   };
 
   const handleTest = async () => {
@@ -69,50 +83,8 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
     onClose();
   };
 
-  const handleTagEdit = (en: string, newZh: string) => {
-    setEditedTags((prev) => {
-      const next = new Map(prev);
-      next.set(en, newZh);
-      return next;
-    });
-  };
-
-  const handleTagSave = async () => {
-    if (editedTags.size === 0) return;
-    setTagSaving(true);
-    const pairs: TagTranslation[] = [];
-    for (const [en, zh] of editedTags) {
-      pairs.push({ en, zh });
-    }
-    await db.setTagTranslations(pairs);
-    // Update local list
-    setTagList((prev) =>
-      prev.map((t) => (editedTags.has(t.en) ? { ...t, zh: editedTags.get(t.en)! } : t))
-    );
-    setEditedTags(new Map());
-    setTagSaving(false);
-  };
-
-  const handleTagDelete = async (en: string) => {
-    await db.deleteTagTranslation(en);
-    setTagList((prev) => prev.filter((t) => t.en !== en));
-    setEditedTags((prev) => {
-      const next = new Map(prev);
-      next.delete(en);
-      return next;
-    });
-  };
-
-  const filteredTags = tagFilter
-    ? tagList.filter(
-        (t) =>
-          t.en.toLowerCase().includes(tagFilter.toLowerCase()) ||
-          t.zh.includes(tagFilter)
-      )
-    : tagList;
-
-  const hasEdits = editedTags.size > 0;
-
+  // (legacy compat — keep variable so JSX below compiles)
+  const filteredTags = genreTags;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 dialog-overlay backdrop-blur-sm" onClick={onClose} />
@@ -161,12 +133,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
             }`}
           >
             <Tag className="w-3 h-3 inline mr-1.5" />
-            标签翻译
-            {tagList.length > 0 && (
-              <span className="ml-1.5 px-1.5 py-0.5 bg-surface-3 text-text-muted rounded text-[10px]">
-                {tagList.length}
-              </span>
-            )}
+            标签库
           </button>
         </div>
 
@@ -331,8 +298,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                   {/* Info */}
                   <div className="p-3 bg-surface-2 rounded-lg text-[10px] text-text-muted space-y-1">
                     <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（无需配置）</p>
-                    <p>• DeepSeek：自动翻译简介和标签为中文（需要 API Key，不走代理）</p>
-                    <p>• 标签翻译结果会缓存到本地，可在「标签翻译」页自定义修改</p>
+                    <p>• DeepSeek：翻译简介 + 从标签库中匹配类型标签（需要 API Key，不走代理）</p>
                   </div>
                 </div>
               )}
@@ -340,66 +306,74 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
           )}
 
           {tab === "tags" && (
-            <div className="space-y-3">
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-text-secondary mb-1">类型标签库</p>
+                <p className="text-[10px] text-text-muted mb-4">
+                  导入游戏时，DeepSeek 会分析 VNDB 英文标签，从这里匹配适合的类型。
+                </p>
+              </div>
+
               {tagLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="w-5 h-5 text-accent animate-spin" />
                 </div>
-              ) : tagList.length === 0 ? (
-                <div className="text-center py-8">
-                  <Tag className="w-8 h-8 text-text-muted/30 mx-auto mb-2" />
-                  <p className="text-xs text-text-muted">暂无翻译缓存</p>
-                  <p className="text-[10px] text-text-muted/60 mt-1">
-                    导入游戏时自动翻译的标签会显示在此处
-                  </p>
-                </div>
               ) : (
                 <>
-                  {/* Search */}
-                  <input
-                    type="text"
-                    value={tagFilter}
-                    onChange={(e) => setTagFilter(e.target.value)}
-                    placeholder="搜索标签..."
-                    className="w-full px-3 py-2 bg-surface-2 border border-surface-3 rounded-lg text-xs text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
-                  />
-
-                  {/* Tag list */}
-                  <div className="space-y-1">
-                    {filteredTags.map((t) => {
-                      const currentZh = editedTags.has(t.en) ? editedTags.get(t.en)! : t.zh;
-                      return (
-                        <div
-                          key={t.en}
-                          className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-2 group"
+                  {/* Tag pills */}
+                  <div className="flex flex-wrap gap-2 min-h-[60px] p-3 bg-surface-2 rounded-xl border border-surface-3">
+                    {genreTags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="group inline-flex items-center gap-1 pl-3 pr-1.5 py-1 bg-accent/12 text-accent text-xs rounded-full border border-accent/20"
+                      >
+                        {tag}
+                        <button
+                          onClick={() => handleRemoveTag(tag)}
+                          className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-accent/20 transition-colors text-accent/60 hover:text-accent"
+                          title="移除"
                         >
-                          <span className="text-[10px] text-text-muted w-28 shrink-0 truncate" title={t.en}>
-                            {t.en}
-                          </span>
-                          <span className="text-text-muted text-[10px]">→</span>
-                          <input
-                            type="text"
-                            value={currentZh}
-                            onChange={(e) => handleTagEdit(t.en, e.target.value)}
-                            className="flex-1 px-2 py-1 bg-transparent border border-transparent focus:border-surface-3 focus:bg-surface-2 rounded text-xs text-text-primary focus:outline-none transition-colors"
-                          />
-                          <button
-                            onClick={() => handleTagDelete(t.en)}
-                            className="opacity-0 group-hover:opacity-100 w-6 h-6 flex items-center justify-center text-text-muted hover:text-status-shelved transition-all"
-                            title="删除"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      );
-                    })}
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </span>
+                    ))}
+                    {genreTags.length === 0 && (
+                      <span className="text-[10px] text-text-muted self-center">
+                        暂无标签，请添加
+                      </span>
+                    )}
                   </div>
 
-                  {filteredTags.length === 0 && tagFilter && (
-                    <p className="text-xs text-text-muted text-center py-4">
-                      未找到匹配「{tagFilter}」的标签
-                    </p>
-                  )}
+                  {/* Add input */}
+                  <div className="flex gap-2">
+                    <input
+                      ref={newTagRef}
+                      type="text"
+                      value={newTagInput}
+                      onChange={(e) => setNewTagInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
+                      placeholder="输入新标签，按 Enter 添加"
+                      maxLength={10}
+                      className="flex-1 px-3 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
+                    />
+                    <button
+                      onClick={handleAddTag}
+                      disabled={!newTagInput.trim() || genreTags.includes(newTagInput.trim())}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-hover disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      添加
+                    </button>
+                  </div>
+
+                  {/* Reset */}
+                  <button
+                    onClick={handleResetTags}
+                    className="flex items-center gap-1.5 text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    恢复默认标签库
+                  </button>
                 </>
               )}
             </div>
@@ -407,49 +381,21 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between items-center gap-3 px-6 py-4 border-t border-surface-3 shrink-0">
-          {tab === "tags" && hasEdits ? (
-            <>
-              <span className="text-[10px] text-accent">
-                {editedTags.size} 项修改未保存
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setEditedTags(new Map())}
-                  className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
-                >
-                  放弃修改
-                </button>
-                <button
-                  onClick={handleTagSave}
-                  disabled={tagSaving}
-                  className="flex items-center gap-1.5 px-5 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg"
-                >
-                  {tagSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-3.5 h-3.5" /> 保存修改</>}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div />
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
-                >
-                  {tab === "api" ? "取消" : "关闭"}
-                </button>
-                {tab === "api" && (
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="px-5 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg"
-                  >
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "保存"}
-                  </button>
-                )}
-              </div>
-            </>
+        <div className="flex justify-end items-center gap-3 px-6 py-4 border-t border-surface-3 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary"
+          >
+            {tab === "api" ? "取消" : "关闭"}
+          </button>
+          {tab === "api" && (
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="px-5 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-lg"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "保存"}
+            </button>
           )}
         </div>
       </div>

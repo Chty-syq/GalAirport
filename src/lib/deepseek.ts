@@ -38,44 +38,22 @@ export async function testApiKey(apiKey: string): Promise<boolean> {
 }
 
 /**
- * Translate an array of English tags to Chinese using DeepSeek.
- * Uses local cache: checks DB first, only calls API for uncached tags,
- * then stores results back to cache.
+ * Match VNDB English tags against a user-defined set of Chinese genre tags.
+ * Returns only the genre tags that apply (zero or more).
  */
-export async function translateTags(
-  tags: string[],
+export async function matchGenreTags(
+  vndbTags: string[],
+  genreTags: string[],
   apiKey: string
 ): Promise<string[]> {
-  if (!tags.length) return tags;
-
-  // 1. Check local cache
-  const { getTagTranslations, setTagTranslations } = await import("@/lib/database");
-  const cached = await getTagTranslations(tags);
-
-  // 2. Split into cached vs uncached
-  const uncached = tags.filter((t) => !cached.has(t));
-
-  // 3. Translate uncached via DeepSeek (if API key and uncached tags exist)
-  if (uncached.length > 0 && apiKey.trim()) {
-    try {
-      const translated = await invoke<string[]>("deepseek_translate_tags", {
-        apiKey,
-        tags: uncached,
-      });
-
-      // Store new translations to cache
-      if (translated.length === uncached.length) {
-        const pairs = uncached.map((en, i) => ({ en, zh: translated[i] }));
-        await setTagTranslations(pairs);
-        for (let i = 0; i < uncached.length; i++) {
-          cached.set(uncached[i], translated[i]);
-        }
-      }
-    } catch {
-      // API failed — uncached tags stay English
-    }
+  if (!vndbTags.length || !genreTags.length || !apiKey.trim()) return [];
+  try {
+    return await invoke<string[]>("deepseek_match_tags", {
+      apiKey,
+      vndbTags,
+      genreTags,
+    });
+  } catch {
+    return [];
   }
-
-  // 4. Return translated (cached) or original for each tag
-  return tags.map((t) => cached.get(t) || t);
 }

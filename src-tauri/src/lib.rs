@@ -542,9 +542,14 @@ async fn deepseek_test(api_key: String) -> Result<bool, String> {
     }
 }
 
-/// Translate an array of tags to Chinese using DeepSeek API.
+/// Match VNDB English tags against a user-defined set of Chinese genre tags.
+/// Returns only the genre tags that apply to this game (zero or more).
 #[tauri::command]
-async fn deepseek_translate_tags(api_key: String, tags: Vec<String>) -> Result<Vec<String>, String> {
+async fn deepseek_match_tags(
+    api_key: String,
+    vndb_tags: Vec<String>,
+    genre_tags: Vec<String>,
+) -> Result<Vec<String>, String> {
     use async_openai::{
         config::OpenAIConfig,
         types::{
@@ -555,8 +560,8 @@ async fn deepseek_translate_tags(api_key: String, tags: Vec<String>) -> Result<V
         Client,
     };
 
-    if tags.is_empty() || api_key.is_empty() {
-        return Ok(tags);
+    if vndb_tags.is_empty() || genre_tags.is_empty() || api_key.is_empty() {
+        return Ok(vec![]);
     }
 
     let config = OpenAIConfig::new()
@@ -569,20 +574,24 @@ async fn deepseek_translate_tags(api_key: String, tags: Vec<String>) -> Result<V
         .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
     let client = Client::with_config(config).with_http_client(http_client);
 
-    let tags_text = tags.join("\n");
+    let vndb_list = vndb_tags.join(", ");
+    let genre_list = genre_tags.join("、");
 
     let request = CreateChatCompletionRequestArgs::default()
         .model("deepseek-chat")
         .temperature(0.0)
-        .max_tokens(1024u32)
+        .max_tokens(256u32)
         .messages(vec![
             ChatCompletionRequestSystemMessageArgs::default()
-                .content("你是一个游戏标签翻译器。将以下英文游戏标签逐行翻译为简洁的简体中文。每行一个标签，保持行数和顺序完全一致。只输出翻译结果，不要编号，不要解释。")
+                .content("你是一个视觉小说分类专家。根据给定的VNDB英文标签，从可用类型标签中选出真正适合这部作品的标签，以JSON数组格式输出。没有匹配则输出[]。只输出JSON数组，不要任何其他内容。")
                 .build()
                 .map_err(|e| e.to_string())?
                 .into(),
             ChatCompletionRequestUserMessageArgs::default()
-                .content(tags_text)
+                .content(format!(
+                    "VNDB标签：{}\n可用类型标签：{}\n\n输出适合的类型标签（JSON数组）：",
+                    vndb_list, genre_list
+                ))
                 .build()
                 .map_err(|e| e.to_string())?
                 .into(),
@@ -596,24 +605,29 @@ async fn deepseek_translate_tags(api_key: String, tags: Vec<String>) -> Result<V
         .await
         .map_err(|e| format!("DeepSeek API error: {}", e))?;
 
-    let content = response
+    let raw = response
         .choices
         .first()
         .and_then(|c| c.message.content.clone())
         .unwrap_or_default();
 
-    let translated: Vec<String> = content
-        .lines()
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
+    // Extract JSON array from response (tolerate extra text/markdown)
+    let json_str = match (raw.find('['), raw.rfind(']')) {
+        (Some(s), Some(e)) if e > s => &raw[s..=e],
+        _ => "[]",
+    };
+
+    let matched: Vec<String> = serde_json::from_str(json_str).unwrap_or_default();
+
+    // Validate: only return tags that exist in genre_tags
+    let genre_set: std::collections::HashSet<&str> =
+        genre_tags.iter().map(|s| s.as_str()).collect();
+    let validated: Vec<String> = matched
+        .into_iter()
+        .filter(|t| genre_set.contains(t.as_str()))
         .collect();
 
-    // If line count matches, use translated; otherwise fall back to originals
-    if translated.len() == tags.len() {
-        Ok(translated)
-    } else {
-        Ok(tags)
-    }
+    Ok(validated)
 }
 
 // ─── App Entry ─────────────────────────────────────────────────
@@ -636,7 +650,7 @@ pub fn run() {
             download_screenshot,
             deepseek_translate,
             deepseek_test,
-            deepseek_translate_tags,
+            deepseek_match_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

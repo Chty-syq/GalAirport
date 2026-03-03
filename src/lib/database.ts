@@ -289,7 +289,29 @@ export async function setSetting(key: string, value: string): Promise<void> {
   );
 }
 
-// ─── Tag Translation Cache ──────────────────────────────────
+// ─── Genre Tag Library ───────────────────────────────────────
+
+export const DEFAULT_GENRE_TAGS = [
+  "百合", "悬疑", "奇幻", "伪娘", "拔作", "纯爱",
+  "妹系", "姐系", "机甲", "猎奇", "轮回", "校园",
+];
+
+export async function getGenreTags(): Promise<string[]> {
+  const val = await getSetting("genre_tags");
+  if (!val) return DEFAULT_GENRE_TAGS;
+  try {
+    const parsed = JSON.parse(val);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_GENRE_TAGS;
+  } catch {
+    return DEFAULT_GENRE_TAGS;
+  }
+}
+
+export async function setGenreTags(tags: string[]): Promise<void> {
+  await setSetting("genre_tags", JSON.stringify(tags));
+}
+
+// ─── Tag Translation Cache (legacy, kept for DB compatibility) ──
 
 export interface TagTranslation {
   en: string;

@@ -24,7 +24,7 @@ import {
   pickOriginalTitle,
   type VndbVn,
 } from "@/lib/vndb";
-import { translateDescription, translateTags } from "@/lib/deepseek";
+import { translateDescription, matchGenreTags } from "@/lib/deepseek";
 import * as database from "@/lib/database";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
@@ -89,9 +89,10 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
     setApplying(true);
 
     try {
-      const [apiKey, proxyUrl] = await Promise.all([
+      const [apiKey, proxyUrl, genreTags] = await Promise.all([
         database.getSetting("deepseek_api_key"),
         database.getSetting("proxy_url"),
+        database.getGenreTags(),
       ]);
 
       const developer =
@@ -146,15 +147,14 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
       })();
 
       const tagsPromise = (async () => {
+        if (!apiKey) return [];
         const vndbTags = extractTags(selectedVn.tags || []);
-        if (apiKey && vndbTags.length > 0) {
-          try {
-            return await translateTags(vndbTags, apiKey);
-          } catch {
-            return vndbTags;
-          }
+        if (!vndbTags.length) return [];
+        try {
+          return await matchGenreTags(vndbTags, genreTags, apiKey);
+        } catch {
+          return [];
         }
-        return vndbTags;
       })();
 
       const [coverPath, screenshotPaths, translatedNotes, translatedTags] = await Promise.all([
@@ -164,8 +164,6 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
         tagsPromise,
       ]);
 
-      const mergedTags = [...new Set([...game.tags, ...translatedTags])];
-
       const update: Partial<GameFormData> = {
         title: game.title || pickDisplayTitle(selectedVn),
         title_original: pickOriginalTitle(selectedVn) || game.title_original,
@@ -174,7 +172,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
         release_date: formatVndbDate(selectedVn.released),
         cover_path: coverPath,
         screenshots: screenshotPaths.length > 0 ? screenshotPaths : game.screenshots,
-        tags: mergedTags,
+        tags: translatedTags,
         vndb_rating: selectedVn.rating || 0,
         vndb_votecount: selectedVn.votecount || 0,
         length_minutes: selectedVn.length_minutes || 0,
