@@ -1,7 +1,7 @@
-import { Gamepad2, Tag, X, Sun, Moon, Settings, FolderOpen } from "lucide-react";
+import { Gamepad2, Tag, X, Palette, Settings, FolderOpen } from "lucide-react";
 import type { Collection, PlayStatus } from "@/types/game";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/hooks/useTheme";
+import { useTheme, THEME_LIST } from "@/hooks/useTheme";
 
 interface TagInfo {
   tag: string;
@@ -42,7 +42,8 @@ export function Sidebar({
   allGames,
   onSettings,
 }: Props) {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, cycleTheme } = useTheme();
+  const themeMeta = THEME_LIST.find((t) => t.id === theme) ?? THEME_LIST[0];
 
   const toggleTag = (tag: string) => {
     if (filterTags.includes(tag)) {
@@ -223,20 +224,16 @@ export function Sidebar({
           设置
         </button>
         <button
-          onClick={toggleTheme}
+          onClick={cycleTheme}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
+          title="点击切换下一个主题"
         >
-          {theme === "dark" ? (
-            <>
-              <Sun className="w-3.5 h-3.5" />
-              切换浅色模式
-            </>
-          ) : (
-            <>
-              <Moon className="w-3.5 h-3.5" />
-              切换深色模式
-            </>
-          )}
+          <Palette className="w-3.5 h-3.5 shrink-0" />
+          <span className="flex-1 text-left">主题：{themeMeta.name}</span>
+          <span
+            className="w-3 h-3 rounded-full shrink-0"
+            style={{ background: themeMeta.preview.accent }}
+          />
         </button>
       </div>
     </aside>

@@ -12,6 +12,7 @@ src-tauri/target/
 # IDE
 .vscode/
 .idea/
+.claude
 *.swp
 *.swo
 *~

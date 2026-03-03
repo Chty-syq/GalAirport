@@ -1,18 +1,21 @@
 import { useState, useEffect } from "react";
-import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Trash2, Save } from "lucide-react";
+import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Trash2, Save, Palette, Check } from "lucide-react";
 import * as db from "@/lib/database";
 import type { TagTranslation } from "@/lib/database";
 import { testApiKey } from "@/lib/deepseek";
+import { useTheme, THEME_LIST } from "@/hooks/useTheme";
 
 interface Props {
   onClose: () => void;
 }
 
-type SettingsTab = "api" | "tags";
+type SettingsTab = "appearance" | "api" | "tags";
 
-export function SettingsDialog({ onClose }: Props) {
-  const [tab, setTab] = useState<SettingsTab>("api");
+export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: SettingsTab }) {
+  const { theme, setTheme } = useTheme();
+  const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
   const [deepseekKey, setDeepseekKey] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"success" | "fail" | null>(null);
@@ -29,6 +32,8 @@ export function SettingsDialog({ onClose }: Props) {
     (async () => {
       const key = await db.getSetting("deepseek_api_key");
       setDeepseekKey(key);
+      const proxy = await db.getSetting("proxy_url");
+      setProxyUrl(proxy);
       setLoading(false);
     })();
   }, []);
@@ -59,6 +64,7 @@ export function SettingsDialog({ onClose }: Props) {
   const handleSave = async () => {
     setSaving(true);
     await db.setSetting("deepseek_api_key", deepseekKey.trim());
+    await db.setSetting("proxy_url", proxyUrl.trim());
     setSaving(false);
     onClose();
   };
@@ -125,6 +131,17 @@ export function SettingsDialog({ onClose }: Props) {
         {/* Tabs */}
         <div className="flex border-b border-surface-3 px-6 shrink-0">
           <button
+            onClick={() => setTab("appearance")}
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              tab === "appearance"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <Palette className="w-3 h-3 inline mr-1.5" />
+            外观
+          </button>
+          <button
             onClick={() => setTab("api")}
             className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
               tab === "api"
@@ -155,6 +172,96 @@ export function SettingsDialog({ onClose }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+          {tab === "appearance" && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-medium text-text-secondary mb-1">主题风格</p>
+                <p className="text-[10px] text-text-muted mb-4">选择你喜欢的界面配色，实时预览效果。</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {THEME_LIST.map((t) => {
+                    const selected = theme === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setTheme(t.id)}
+                        className={`relative rounded-xl overflow-hidden border-2 transition-all focus:outline-none ${
+                          selected
+                            ? "border-accent shadow-lg shadow-accent/20 scale-[1.03]"
+                            : "border-surface-3 hover:border-surface-4 hover:scale-[1.02]"
+                        }`}
+                        title={t.name}
+                      >
+                        {/* Mini app preview */}
+                        <div
+                          className="h-20 flex"
+                          style={{ background: t.preview.bg }}
+                        >
+                          {/* Fake sidebar strip */}
+                          <div
+                            className="w-8 h-full flex flex-col items-center pt-2 gap-1.5"
+                            style={{ background: t.preview.sidebar }}
+                          >
+                            <div
+                              className="w-4 h-4 rounded-full"
+                              style={{ background: t.preview.accent }}
+                            />
+                            <div className="w-4 h-0.5 rounded" style={{ background: t.preview.text, opacity: 0.2 }} />
+                            <div className="w-4 h-0.5 rounded" style={{ background: t.preview.text, opacity: 0.15 }} />
+                            <div className="w-4 h-0.5 rounded" style={{ background: t.preview.text, opacity: 0.1 }} />
+                          </div>
+                          {/* Fake content area */}
+                          <div className="flex-1 p-2 flex flex-col gap-1.5">
+                            {/* Fake card row */}
+                            {[0.9, 0.6, 0.4].map((op, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-1.5"
+                              >
+                                <div
+                                  className="w-5 h-5 rounded"
+                                  style={{ background: t.preview.surface, opacity: op + 0.1 }}
+                                />
+                                <div className="flex-1 space-y-0.5">
+                                  <div
+                                    className="h-1 rounded"
+                                    style={{ background: t.preview.text, opacity: op * 0.6 }}
+                                  />
+                                  <div
+                                    className="h-0.5 rounded w-3/4"
+                                    style={{ background: t.preview.text, opacity: op * 0.3 }}
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Theme name bar */}
+                        <div
+                          className="px-2.5 py-1.5 flex items-center justify-between"
+                          style={{ background: t.preview.surface }}
+                        >
+                          <span
+                            className="text-[10px] font-medium"
+                            style={{ color: t.preview.text }}
+                          >
+                            {t.name}
+                          </span>
+                          {selected && (
+                            <Check
+                              className="w-3 h-3"
+                              style={{ color: t.preview.accent }}
+                            />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {tab === "api" && (
             <>
               {loading ? (
@@ -204,10 +311,27 @@ export function SettingsDialog({ onClose }: Props) {
                     </div>
                   </div>
 
+                  {/* Proxy URL */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-2">
+                      代理地址
+                    </label>
+                    <p className="text-[10px] text-text-muted mb-2">
+                      用于 VNDB 封面/截图下载。格式：<span className="text-accent">http://127.0.0.1:7890</span>。留空则不使用代理。
+                    </p>
+                    <input
+                      type="text"
+                      value={proxyUrl}
+                      onChange={(e) => setProxyUrl(e.target.value)}
+                      placeholder="http://127.0.0.1:7890"
+                      className="w-full px-3 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
+                    />
+                  </div>
+
                   {/* Info */}
                   <div className="p-3 bg-surface-2 rounded-lg text-[10px] text-text-muted space-y-1">
                     <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（无需配置）</p>
-                    <p>• DeepSeek：自动翻译简介和标签为中文（需要 API Key）</p>
+                    <p>• DeepSeek：自动翻译简介和标签为中文（需要 API Key，不走代理）</p>
                     <p>• 标签翻译结果会缓存到本地，可在「标签翻译」页自定义修改</p>
                   </div>
                 </div>

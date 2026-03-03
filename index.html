@@ -12,8 +12,9 @@
     <script>
       // Prevent flash: apply saved theme before first paint
       try {
+        const valid = ["dark", "light", "midnight", "forest", "sakura", "mocha"];
         const t = localStorage.getItem("gm-theme");
-        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        if (t && valid.includes(t)) document.documentElement.setAttribute("data-theme", t);
       } catch {}
     </script>
   </head>

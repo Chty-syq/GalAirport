@@ -274,12 +274,87 @@ fn find_save_directories(install_path: String) -> Result<Vec<String>, String> {
     Ok(found)
 }
 
+/// Parse a Windows ProxyServer registry value into an http:// URL.
+/// Handles formats: "127.0.0.1:7890", "http://127.0.0.1:7890",
+/// and per-protocol "http=127.0.0.1:7890;https=127.0.0.1:7890".
+#[cfg(target_os = "windows")]
+fn parse_windows_proxy_server(proxy_server: &str) -> Option<String> {
+    if proxy_server.is_empty() {
+        return None;
+    }
+    // Per-protocol format
+    if proxy_server.contains('=') {
+        for proto in &["https", "http"] {
+            let prefix = format!("{}=", proto);
+            for part in proxy_server.split(';') {
+                if let Some(addr) = part.trim().strip_prefix(prefix.as_str()) {
+                    return Some(format!("http://{}", addr));
+                }
+            }
+        }
+        return None;
+    }
+    // Already has scheme
+    if proxy_server.starts_with("http://") || proxy_server.starts_with("https://") {
+        return Some(proxy_server.to_string());
+    }
+    // Plain host:port
+    Some(format!("http://{}", proxy_server))
+}
+
+/// Detect the Windows system proxy (HKCU Internet Settings).
+/// Returns None if proxy is disabled or not configured.
+#[cfg(target_os = "windows")]
+fn detect_windows_system_proxy() -> Option<String> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let settings = hkcu
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings")
+        .ok()?;
+    let enabled: u32 = settings.get_value("ProxyEnable").ok()?;
+    if enabled == 0 {
+        return None;
+    }
+    let server: String = settings.get_value("ProxyServer").ok()?;
+    parse_windows_proxy_server(&server)
+}
+
+/// Build a reqwest Client that routes through the given proxy URL.
+/// Priority: explicit proxy_url > HTTPS_PROXY/HTTP_PROXY env vars (reqwest default)
+///           > Windows system proxy (registry) > no proxy.
+fn build_proxy_client(proxy_url: &str) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder();
+    if !proxy_url.is_empty() {
+        // Explicit proxy from app settings
+        let proxy = reqwest::Proxy::all(proxy_url)
+            .map_err(|e| format!("Invalid proxy URL: {}", e))?;
+        builder = builder.proxy(proxy);
+    } else {
+        // Fall back to Windows system proxy when no env vars are set
+        #[cfg(target_os = "windows")]
+        if std::env::var("HTTPS_PROXY")
+            .or_else(|_| std::env::var("HTTP_PROXY"))
+            .map(|v| v.is_empty())
+            .unwrap_or(true)
+        {
+            if let Some(sys_proxy) = detect_windows_system_proxy() {
+                if let Ok(proxy) = reqwest::Proxy::all(&sys_proxy) {
+                    builder = builder.proxy(proxy);
+                }
+            }
+        }
+    }
+    builder.build().map_err(|e| format!("Failed to build HTTP client: {}", e))
+}
+
 /// Download a cover image from URL and save to app data covers directory.
 #[tauri::command]
 async fn download_cover(
     app_handle: tauri::AppHandle,
     url: String,
     filename: String,
+    proxy_url: String,
 ) -> Result<String, String> {
     let app_data = app_handle
         .path()
@@ -291,7 +366,15 @@ async fn download_cover(
 
     let dest = covers_dir.join(&filename);
 
-    let response = reqwest::get(&url)
+    // Skip if already downloaded
+    if dest.exists() {
+        return Ok(dest.to_string_lossy().to_string());
+    }
+
+    let client = build_proxy_client(&proxy_url)?;
+    let response = client
+        .get(&url)
+        .send()
         .await
         .map_err(|e| format!("Failed to download image: {}", e))?;
 
@@ -316,6 +399,7 @@ async fn download_screenshot(
     app_handle: tauri::AppHandle,
     url: String,
     filename: String,
+    proxy_url: String,
 ) -> Result<String, String> {
     let app_data = app_handle
         .path()
@@ -332,7 +416,10 @@ async fn download_screenshot(
         return Ok(dest.to_string_lossy().to_string());
     }
 
-    let response = reqwest::get(&url)
+    let client = build_proxy_client(&proxy_url)?;
+    let response = client
+        .get(&url)
+        .send()
         .await
         .map_err(|e| format!("Failed to download screenshot: {}", e))?;
 
@@ -368,7 +455,11 @@ async fn deepseek_translate(api_key: String, text: String) -> Result<String, Str
         .with_api_key(&api_key)
         .with_api_base("https://api.deepseek.com/v1");
 
-    let client = Client::with_config(config);
+    let http_client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    let client = Client::with_config(config).with_http_client(http_client);
 
     let request = CreateChatCompletionRequestArgs::default()
         .model("deepseek-chat")
@@ -426,7 +517,11 @@ async fn deepseek_test(api_key: String) -> Result<bool, String> {
         .with_api_key(&api_key)
         .with_api_base("https://api.deepseek.com/v1");
 
-    let client = Client::with_config(config);
+    let http_client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    let client = Client::with_config(config).with_http_client(http_client);
 
     let request = CreateChatCompletionRequestArgs::default()
         .model("deepseek-chat")
@@ -468,7 +563,11 @@ async fn deepseek_translate_tags(api_key: String, tags: Vec<String>) -> Result<V
         .with_api_key(&api_key)
         .with_api_base("https://api.deepseek.com/v1");
 
-    let client = Client::with_config(config);
+    let http_client = reqwest::Client::builder()
+        .no_proxy()
+        .build()
+        .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
+    let client = Client::with_config(config).with_http_client(http_client);
 
     let tags_text = tags.join("\n");
 

@@ -89,7 +89,10 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
     setApplying(true);
 
     try {
-      const apiKey = await database.getSetting("deepseek_api_key");
+      const [apiKey, proxyUrl] = await Promise.all([
+        database.getSetting("deepseek_api_key"),
+        database.getSetting("proxy_url"),
+      ]);
 
       const developer =
         selectedVn.developers?.length > 0
@@ -104,6 +107,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
             return await invoke<string>("download_cover", {
               url: selectedVn.image.url,
               filename: `${selectedVn.id}.${ext}`,
+              proxyUrl,
             });
           } catch (err) {
             toast("error", `「${selectedVn.title}」封面下载失败: ${err}`);
@@ -118,7 +122,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
         const results = await Promise.allSettled(
           safe.map((ss) => {
             const ext = ss.url.split(".").pop() || "jpg";
-            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}` });
+            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl });
           })
         );
         return results

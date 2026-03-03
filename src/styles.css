@@ -6,59 +6,183 @@
 /* Colors stored as RGB channels so Tailwind opacity modifiers work:
    e.g. bg-surface-0/50 → rgba(var(--surface-0), 0.5) */
 
+/* ── Dark: 暗夜 ── hsl(252°) 深紫蓝基底，通透渐变 ─────────── */
+
 :root,
 html[data-theme="dark"] {
-  --surface-0: 10 10 15;
-  --surface-1: 18 18 26;
-  --surface-2: 26 26 37;
-  --surface-3: 35 35 48;
-  --surface-4: 44 44 58;
+  --surface-0: 12 11 18;
+  --surface-1: 18 17 27;
+  --surface-2: 27 25 41;
+  --surface-3: 38 36 56;
+  --surface-4: 52 50 74;
 
-  --accent: 108 99 255;
-  --accent-hover: 127 120 255;
-  --accent-dim: 74 67 176;
+  --accent: 122 106 245;
+  --accent-hover: 148 134 252;
+  --accent-dim: 82 68 188;
 
-  --text-primary: 232 230 240;
-  --text-secondary: 152 150 168;
-  --text-muted: 107 105 122;
+  --text-primary: 228 226 244;
+  --text-secondary: 146 143 174;
+  --text-muted: 100 98 124;
 
-  --status-unplayed: 107 105 122;
-  --status-playing: 245 166 35;
-  --status-finished: 76 217 100;
-  --status-shelved: 255 107 107;
-  --status-completed: 192 132 252;
+  --status-unplayed: 100 98 124;
+  --status-playing: 245 163 28;
+  --status-finished: 64 214 106;
+  --status-shelved: 248 88 88;
+  --status-completed: 192 130 250;
 
-  --scrollbar-thumb: #2c2c3a;
-  --scrollbar-thumb-hover: #3a3a4a;
-  --overlay-bg: rgba(0, 0, 0, 0.6);
+  --scrollbar-thumb: #262438;
+  --scrollbar-thumb-hover: #34324a;
+  --overlay-bg: rgba(0, 0, 0, 0.65);
 
   color-scheme: dark;
 }
 
+/* ── Light: 明亮 ── hsl(252°) 淡紫白调，清透有型 ──────────── */
+
 html[data-theme="light"] {
-  --surface-0: 244 243 248;
-  --surface-1: 255 255 255;
-  --surface-2: 240 239 245;
-  --surface-3: 228 227 236;
-  --surface-4: 213 212 223;
+  --surface-0: 238 236 249;
+  --surface-1: 249 249 254;
+  --surface-2: 230 228 246;
+  --surface-3: 218 215 238;
+  --surface-4: 202 200 224;
 
-  --accent: 91 82 224;
-  --accent-hover: 74 66 204;
-  --accent-dim: 122 115 240;
+  --accent: 82 66 214;
+  --accent-hover: 66 50 196;
+  --accent-dim: 116 102 238;
 
-  --text-primary: 26 26 46;
-  --text-secondary: 90 88 110;
-  --text-muted: 136 134 160;
+  --text-primary: 24 22 48;
+  --text-secondary: 82 78 116;
+  --text-muted: 142 140 170;
 
-  --status-unplayed: 136 134 160;
-  --status-playing: 212 140 16;
-  --status-finished: 45 168 69;
-  --status-shelved: 224 78 78;
-  --status-completed: 147 51 234;
+  --status-unplayed: 142 140 170;
+  --status-playing: 196 126 12;
+  --status-finished: 32 158 64;
+  --status-shelved: 208 60 60;
+  --status-completed: 120 46 218;
 
-  --scrollbar-thumb: #d5d4df;
-  --scrollbar-thumb-hover: #c0bfcc;
-  --overlay-bg: rgba(0, 0, 0, 0.3);
+  --scrollbar-thumb: #ccc9e2;
+  --scrollbar-thumb-hover: #b8b5d0;
+  --overlay-bg: rgba(10, 8, 30, 0.28);
+
+  color-scheme: light;
+}
+
+/* ── Midnight: 午夜蓝 ── hsl(222°) 深海藏蓝，青蓝点睛 ─────── */
+
+html[data-theme="midnight"] {
+  --surface-0: 9 12 25;
+  --surface-1: 15 20 42;
+  --surface-2: 21 30 62;
+  --surface-3: 31 44 86;
+  --surface-4: 44 62 116;
+
+  --accent: 56 178 248;
+  --accent-hover: 94 202 255;
+  --accent-dim: 28 124 192;
+
+  --text-primary: 214 226 248;
+  --text-secondary: 126 158 210;
+  --text-muted: 80 106 154;
+
+  --status-unplayed: 80 106 154;
+  --status-playing: 252 186 4;
+  --status-finished: 52 208 110;
+  --status-shelved: 248 88 88;
+  --status-completed: 156 124 246;
+
+  --scrollbar-thumb: #1f2c56;
+  --scrollbar-thumb-hover: #2b3c72;
+  --overlay-bg: rgba(4, 6, 20, 0.75);
+
+  color-scheme: dark;
+}
+
+/* ── Forest: 森林 ── hsl(136°) 原始深林，绿意盎然 ──────────── */
+
+html[data-theme="forest"] {
+  --surface-0: 9 16 11;
+  --surface-1: 15 26 17;
+  --surface-2: 22 37 25;
+  --surface-3: 33 53 36;
+  --surface-4: 47 71 50;
+
+  --accent: 52 202 102;
+  --accent-hover: 88 220 130;
+  --accent-dim: 30 148 66;
+
+  --text-primary: 210 238 214;
+  --text-secondary: 120 176 128;
+  --text-muted: 76 120 86;
+
+  --status-unplayed: 76 120 86;
+  --status-playing: 246 186 26;
+  --status-finished: 52 202 102;
+  --status-shelved: 248 96 96;
+  --status-completed: 166 128 244;
+
+  --scrollbar-thumb: #213524;
+  --scrollbar-thumb-hover: #2d4830;
+  --overlay-bg: rgba(2, 8, 4, 0.70);
+
+  color-scheme: dark;
+}
+
+/* ── Sakura: 樱花 ── hsl(334°) 浅粉细腻，深玫点缀 ──────────── */
+
+html[data-theme="sakura"] {
+  --surface-0: 251 244 248;
+  --surface-1: 254 251 252;
+  --surface-2: 244 232 240;
+  --surface-3: 233 214 226;
+  --surface-4: 218 192 210;
+
+  --accent: 208 38 88;
+  --accent-hover: 228 56 108;
+  --accent-dim: 174 22 68;
+
+  --text-primary: 42 12 30;
+  --text-secondary: 116 70 96;
+  --text-muted: 180 136 162;
+
+  --status-unplayed: 180 136 162;
+  --status-playing: 194 122 8;
+  --status-finished: 24 152 68;
+  --status-shelved: 208 38 88;
+  --status-completed: 112 40 190;
+
+  --scrollbar-thumb: #dcc8d8;
+  --scrollbar-thumb-hover: #c8b0c4;
+  --overlay-bg: rgba(60, 8, 40, 0.24);
+
+  color-scheme: light;
+}
+
+/* ── Mocha: 摩卡 ── hsl(32°) 暖奶焦糖，浓醇咖啡 ───────────── */
+
+html[data-theme="mocha"] {
+  --surface-0: 247 239 227;
+  --surface-1: 252 247 240;
+  --surface-2: 238 228 212;
+  --surface-3: 226 214 196;
+  --surface-4: 208 196 175;
+
+  --accent: 178 82 19;
+  --accent-hover: 202 98 28;
+  --accent-dim: 148 62 12;
+
+  --text-primary: 52 32 12;
+  --text-secondary: 120 88 56;
+  --text-muted: 180 152 116;
+
+  --status-unplayed: 180 152 116;
+  --status-playing: 178 82 19;
+  --status-finished: 38 148 68;
+  --status-shelved: 202 50 50;
+  --status-completed: 118 48 188;
+
+  --scrollbar-thumb: #c8b898;
+  --scrollbar-thumb-hover: #b4a07c;
+  --overlay-bg: rgba(48, 28, 8, 0.26);
 
   color-scheme: light;
 }

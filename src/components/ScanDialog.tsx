@@ -116,20 +116,34 @@ export function ScanDialog({ onImport, onClose }: Props) {
   const startMatching = async () => {
     if (items.length === 0) return;
     setPhase("matching");
-    console.log("matching");
 
-    // Pre-fetch API key once (avoid repeated DB reads)
+    // Pre-fetch API key and proxy URL once (avoid repeated DB reads)
     const apiKey = await db.getSetting("deepseek_api_key");
+    const proxyUrl = await db.getSetting("proxy_url");
 
     const total = items.length;
-    for (let i = 0; i < total; i++) {
-      const item = items[i];
-      setProgress({ current: i + 1, total, label: item.detected.title });
+    const CONCURRENCY = 5;
+    const TIMEOUT_MS = 60_000;
+    let completedCount = 0;
 
-      setItems((prev) =>
-        prev.map((it, idx) => (idx === i ? { ...it, status: "matching" } : it))
-      );
+    // Mark all items as "matching" immediately
+    setItems((prev) => prev.map((it) => ({ ...it, status: "matching" })));
+    setProgress({ current: 0, total, label: "" });
 
+    // Semaphore: limit concurrent matches
+    let slots = CONCURRENCY;
+    const waiters: (() => void)[] = [];
+    const acquire = () =>
+      new Promise<void>((resolve) => {
+        if (slots > 0) { slots--; resolve(); }
+        else waiters.push(resolve);
+      });
+    const release = () => {
+      if (waiters.length > 0) waiters.shift()!();
+      else slots++;
+    };
+
+    const processItem = async (item: ImportItem, i: number): Promise<void> => {
       try {
         const res = await searchVn(item.detected.title);
         let vn: VndbVn | null = null;
@@ -140,8 +154,6 @@ export function ScanDialog({ onImport, onClose }: Props) {
           if (!vn) vn = candidates[0];
         }
 
-        // Run cover download, screenshot downloads, translation, and tag translation in PARALLEL
-        console.log("downing");
         const coverPromise = (async () => {
           if (vn?.image?.url) {
             try {
@@ -149,6 +161,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
               return await invoke<string>("download_cover", {
                 url: vn.image.url,
                 filename: `${vn.id}.${ext}`,
+                proxyUrl,
               });
             } catch (err) {
               toast("error", `「${pickDisplayTitle(vn!)}」封面下载失败: ${err}`);
@@ -160,11 +173,10 @@ export function ScanDialog({ onImport, onClose }: Props) {
         const screenshotsPromise = (async () => {
           if (!vn?.screenshots?.length) return [];
           const safe = vn.screenshots.filter((s) => s.sexual < 1 && s.violence < 1).slice(0, 4);
-          // Download all screenshots in parallel
           const results = await Promise.allSettled(
             safe.map((ss) => {
               const ext = ss.url.split(".").pop() || "jpg";
-              return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}` });
+              return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl });
             })
           );
           return results
@@ -199,7 +211,6 @@ export function ScanDialog({ onImport, onClose }: Props) {
           return vndbTags;
         })();
 
-        // Await all in parallel
         const [coverPath, screenshotPaths, translatedDesc, translatedTags] = await Promise.all([
           coverPromise,
           screenshotsPromise,
@@ -231,16 +242,43 @@ export function ScanDialog({ onImport, onClose }: Props) {
           )
         );
       }
+    };
 
-      if (i < total - 1) await new Promise((r) => setTimeout(r, 500));
-    }
+    await Promise.allSettled(
+      items.map(async (item, i) => {
+        await acquire();
+
+        const work = new Promise<void>((resolve) => {
+          processItem(item, i).finally(resolve);
+        });
+
+        const timeout = new Promise<void>((resolve) => {
+          setTimeout(() => {
+            toast("error", `「${item.detected.title}」匹配超时（${TIMEOUT_MS / 1000}s）`);
+            setItems((prev) =>
+              prev.map((it, idx) =>
+                idx === i && it.status === "matching"
+                  ? { ...it, status: "failed", error: "匹配超时" }
+                  : it
+              )
+            );
+            resolve();
+          }, TIMEOUT_MS);
+        });
+
+        await Promise.race([work, timeout]);
+
+        release();
+        completedCount++;
+        setProgress({ current: completedCount, total, label: item.detected.title });
+      })
+    );
 
     setPhase("review");
     setActiveIdx(0);
   };
 
   // ── Review: select different candidate ──────────────────────
-  console.log("reviewing");
   const openPanel = (index: number) => {
     setActiveIdx(index);
     const item = items[index];
@@ -284,7 +322,10 @@ export function ScanDialog({ onImport, onClose }: Props) {
         prev.map((it, idx) => (idx === targetIdx ? { ...it, vndb: fullVn! } : it))
       );
 
-      const apiKey = await db.getSetting("deepseek_api_key");
+      const [apiKey, proxyUrl] = await Promise.all([
+        db.getSetting("deepseek_api_key"),
+        db.getSetting("proxy_url"),
+      ]);
 
       const coverPromise = (async () => {
         if (fullVn!.image?.url) {
@@ -293,6 +334,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
             return await invoke<string>("download_cover", {
               url: fullVn!.image.url,
               filename: `${fullVn!.id}.${ext}`,
+              proxyUrl,
             });
           } catch (err) {
             toast("error", `「${pickDisplayTitle(fullVn!)}」封面下载失败: ${err}`);
@@ -307,7 +349,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
         const results = await Promise.allSettled(
           safe.map((ss) => {
             const ext = ss.url.split(".").pop() || "jpg";
-            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}` });
+            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl });
           })
         );
         return results
@@ -379,7 +421,6 @@ export function ScanDialog({ onImport, onClose }: Props) {
 
   const handleImport = async () => {
     setPhase("importing");
-    console.log("importing");
     const toImport: GameFormData[] = items.map((item) => {
       const vn = item.vndb;
       const developer =
