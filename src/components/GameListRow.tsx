@@ -1,4 +1,4 @@
-import { Play, Star, Clock, Edit, Trash2, Check } from "lucide-react";
+import { Play, Star, Clock, Edit, Trash2, Check, Globe } from "lucide-react";
 import type { Game, PlayStatus } from "@/types/game";
 import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { StatusDropdown } from "@/components/StatusDropdown";
@@ -22,18 +22,19 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
     if (!isRunning) onLaunch(game);
   };
 
-  const stars = Array.from({ length: 5 }, (_, i) => i < Math.round(game.rating / 2));
+  const userStars = Array.from({ length: 5 }, (_, i) => i < Math.round(game.rating / 2));
+  const visibleTags = game.tags.slice(0, 3);
 
   return (
     <div
       className={cn(
-        "group flex items-center gap-4 px-4 py-3 rounded-lg cursor-pointer transition-colors",
+        "group flex items-center gap-3 px-4 py-2.5 rounded-lg cursor-pointer transition-colors",
         selectionMode && isSelected ? "bg-accent/8 hover:bg-accent/12" : "bg-surface-1 hover:bg-surface-2"
       )}
       onClick={() => selectionMode ? onToggleSelect?.(game.id) : onClick(game)}
     >
-      {/* Checkbox (selection mode) or mini cover */}
-      {selectionMode ? (
+      {/* Checkbox (selection mode) */}
+      {selectionMode && (
         <div
           className={cn(
             "w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors",
@@ -43,7 +44,7 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
         >
           {isSelected && <Check className="w-3 h-3 text-white" />}
         </div>
-      ) : null}
+      )}
 
       {/* Mini cover */}
       <div className="w-10 h-14 rounded-md overflow-hidden bg-surface-3 flex-shrink-0">
@@ -60,14 +61,50 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
         )}
       </div>
 
-      {/* Title & developer */}
+      {/* Title, developer & tags */}
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-medium text-text-primary truncate">
+        <h3 className="text-sm font-medium text-text-primary truncate leading-snug">
           {game.title}
         </h3>
-        <p className="text-xs text-text-muted truncate">
-          {game.developer || "未知开发商"}
-        </p>
+        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+          <span className="text-xs text-text-muted truncate shrink-0 max-w-[140px]">
+            {game.developer || "未知开发商"}
+          </span>
+          {visibleTags.length > 0 && (
+            <span className="text-text-muted/30 text-xs flex-shrink-0">·</span>
+          )}
+          {visibleTags.map((tag) => (
+            <span
+              key={tag}
+              className="inline-flex items-center px-1.5 py-px bg-accent/10 text-accent text-[10px] font-medium rounded-full border border-accent/15 leading-none flex-shrink-0"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* VNDB rating */}
+      <div className="w-16 flex-shrink-0 flex items-center justify-end">
+        {game.vndb_rating > 0 ? (
+          <span className="flex items-center gap-1 text-xs font-medium text-text-secondary">
+            <Globe className="w-3 h-3 text-text-muted" />
+            {(game.vndb_rating / 10).toFixed(2)}
+          </span>
+        ) : null}
+      </div>
+
+      {/* User rating (only when rated) */}
+      <div className="w-20 flex-shrink-0 flex items-center justify-end gap-0.5">
+        {game.rating > 0
+          ? userStars.map((filled, i) => (
+              <Star
+                key={i}
+                className={cn("w-3 h-3", filled ? "text-yellow-400" : "text-surface-4")}
+                fill={filled ? "currentColor" : "none"}
+              />
+            ))
+          : null}
       </div>
 
       {/* Status */}
@@ -86,19 +123,8 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
         </span>
       )}
 
-      {/* Rating */}
-      <div className="flex gap-0.5 flex-shrink-0">
-        {stars.map((filled, i) => (
-          <Star
-            key={i}
-            className={cn("w-3 h-3", filled ? "text-yellow-400" : "text-surface-4")}
-            fill={filled ? "currentColor" : "none"}
-          />
-        ))}
-      </div>
-
       {/* Playtime */}
-      <span className="text-xs text-text-muted w-24 text-right flex-shrink-0 flex items-center justify-end gap-1">
+      <span className="text-xs text-text-muted w-20 text-right flex-shrink-0 flex items-center justify-end gap-1">
         <Clock className="w-3 h-3" />
         {game.total_playtime > 0 ? formatPlaytime(game.total_playtime) : "—"}
       </span>

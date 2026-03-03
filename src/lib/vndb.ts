@@ -105,7 +105,7 @@ export async function searchVn(query: string, page = 1): Promise<VndbSearchResul
     filters: ["search", "=", query],
     fields: VN_FIELDS,
     sort: "searchrank",
-    results: 10,
+    results: 30,
     page,
   };
 
@@ -161,7 +161,7 @@ async function fetchDevelopers(vnId: string): Promise<VndbProducer[]> {
     const body = {
       filters: ["and", ["vn", "=", ["id", "=", vnId]], ["official", "=", 1]],
       fields: "producers.id, producers.name, producers.original, producers.developer",
-      results: 10,
+      results: 30,
     };
 
     const resp = await fetch(`${VNDB_API}/release`, {

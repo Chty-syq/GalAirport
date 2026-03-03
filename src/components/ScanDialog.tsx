@@ -253,8 +253,9 @@ export function ScanDialog({ onImport, onClose }: Props) {
           processItem(item, i).finally(resolve);
         });
 
+        let timerId: ReturnType<typeof setTimeout> | undefined;
         const timeout = new Promise<void>((resolve) => {
-          setTimeout(() => {
+          timerId = setTimeout(() => {
             toast("error", `「${item.detected.title}」匹配超时（${TIMEOUT_MS / 1000}s）`);
             setItems((prev) =>
               prev.map((it, idx) =>
@@ -268,6 +269,7 @@ export function ScanDialog({ onImport, onClose }: Props) {
         });
 
         await Promise.race([work, timeout]);
+        clearTimeout(timerId);
 
         release();
         completedCount++;

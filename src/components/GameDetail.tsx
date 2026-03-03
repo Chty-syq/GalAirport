@@ -17,6 +17,7 @@ interface Props {
 
 export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbMatch, onStatusChange }: Props) {
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+  const [coverPad, setCoverPad] = useState<number | null>(null);
 
   const openFolder = async () => {
     await invoke("open_folder", { path: game.install_path });
@@ -43,16 +44,25 @@ export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbM
           <X className="w-4 h-4 text-text-secondary" />
         </button>
 
-        {/* Cover */}
-        <div className="relative aspect-video bg-surface-2">
+        {/* Cover — shows top 75% of the image */}
+        <div
+          className="relative w-full overflow-hidden bg-surface-2"
+          style={{ paddingTop: coverPad !== null ? `${coverPad}%` : "100%" }}
+        >
           {game.cover_path ? (
             <img
               src={coverSrc(game.cover_path)}
               alt={game.title}
-              className="w-full h-full object-cover"
+              className="absolute top-0 left-0 w-full h-auto block"
+              onLoad={(e) => {
+                const { naturalWidth, naturalHeight } = e.currentTarget;
+                if (naturalWidth > 0) {
+                  setCoverPad((naturalHeight / naturalWidth) * 75);
+                }
+              }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface-2 to-surface-3">
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-surface-2 to-surface-3">
               <span className="text-6xl font-bold text-text-muted/20">
                 {game.title.charAt(0)}
               </span>
