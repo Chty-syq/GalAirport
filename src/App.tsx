@@ -16,6 +16,7 @@ import { ScanDialog } from "@/components/ScanDialog";
 import { VndbMatchDialog } from "@/components/VndbMatchDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { CollectionManagerDialog } from "@/components/CollectionDialog";
+import { HelpDialog } from "@/components/HelpDialog";
 
 function App() {
   const library = useGameLibrary();
@@ -27,6 +28,7 @@ function App() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [vndbMatchGame, setVndbMatchGame] = useState<Game | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [showCollectionDialog, setShowCollectionDialog] = useState(false);
   const [runningGameId, setRunningGameId] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -156,6 +158,7 @@ function App() {
         onFilterCollection={library.setFilterCollection}
         allGames={library.allGames}
         onSettings={() => setShowSettings(true)}
+        onHelp={() => setShowHelp(true)}
       />
 
       {/* Main content area */}
@@ -326,6 +329,10 @@ function App() {
 
       {showSettings && (
         <SettingsDialog onClose={() => setShowSettings(false)} />
+      )}
+
+      {showHelp && (
+        <HelpDialog onClose={() => setShowHelp(false)} />
       )}
 
       {showCollectionDialog && (

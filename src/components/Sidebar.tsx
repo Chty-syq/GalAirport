@@ -1,7 +1,6 @@
-import { Gamepad2, Tag, X, Palette, Settings, FolderOpen } from "lucide-react";
+import { Gamepad2, Tag, X, Settings, FolderOpen, HelpCircle } from "lucide-react";
 import type { Collection, PlayStatus } from "@/types/game";
 import { cn } from "@/lib/utils";
-import { useTheme, THEME_LIST } from "@/hooks/useTheme";
 
 interface TagInfo {
   tag: string;
@@ -20,6 +19,7 @@ interface Props {
   onFilterCollection: (id: string | null) => void;
   allGames: { collection_id: string | null }[];
   onSettings: () => void;
+  onHelp: () => void;
 }
 
 const STATUS_OPTIONS: { value: PlayStatus; label: string; dot: string }[] = [
@@ -41,10 +41,8 @@ export function Sidebar({
   onFilterCollection,
   allGames,
   onSettings,
+  onHelp,
 }: Props) {
-  const { theme, cycleTheme } = useTheme();
-  const themeMeta = THEME_LIST.find((t) => t.id === theme) ?? THEME_LIST[0];
-
   const toggleTag = (tag: string) => {
     if (filterTags.includes(tag)) {
       onFilterTagsChange(filterTags.filter((t) => t !== tag));
@@ -214,7 +212,7 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Bottom actions */}
+      {/* 底部操作 */}
       <div className="px-3 py-3 border-t border-surface-3/60 space-y-0.5">
         <button
           onClick={onSettings}
@@ -224,16 +222,11 @@ export function Sidebar({
           设置
         </button>
         <button
-          onClick={cycleTheme}
+          onClick={onHelp}
           className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
-          title="点击切换下一个主题"
         >
-          <Palette className="w-3.5 h-3.5 shrink-0" />
-          <span className="flex-1 text-left">主题：{themeMeta.name}</span>
-          <span
-            className="w-3 h-3 rounded-full shrink-0"
-            style={{ background: themeMeta.preview.accent }}
-          />
+          <HelpCircle className="w-3.5 h-3.5" />
+          使用帮助
         </button>
       </div>
     </aside>
