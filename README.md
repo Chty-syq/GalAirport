@@ -1,91 +1,72 @@
-# GalManager — 本地 Galgame 管理器
+# GalManager
 
-一个基于 Tauri 2 + React + TypeScript 的 Windows 桌面应用，用于管理本地安装的 Galgame。
+本地 Galgame 库管理器，基于 Tauri 2 + React + TypeScript 构建。
 
-## 功能 (MVP)
+## 功能
 
-- **游戏库管理** — 手动添加或扫描文件夹自动发现游戏
-- **引擎识别** — 自动识别 KiriKiri、NScripter、Unity 等常见引擎
-- **元数据编辑** — 标题、开发商、发售日、评分、标签、备注
-- **封面墙 / 列表** — 两种视图模式切换
-- **一键启动** — 直接从管理器启动游戏
-- **搜索筛选** — 按标题搜索，按状态筛选，多种排序方式
-- **深色主题** — 专为 Galgame 爱好者设计的暗色 UI
+### 游戏库管理
+- 手动添加游戏，或扫描本地目录批量导入
+- 自动识别游戏引擎（KiriKiri、NScripter、Unity、SiglusEngine 等）
+- 网格 / 列表两种视图，支持按标题、评分、发售日、游玩时长、添加时间排序
+- 合集分组，支持自定义排序；侧边栏"显示全部"开关可切换仅看未分类游戏
 
-## 环境要求
+### 状态与游玩时间
+- 四档状态：未开始 / 游玩中 / 已通关 / 全线通关
+- 自动记录每次游玩时长并累计统计
 
-- [Node.js](https://nodejs.org/) >= 18
-- [Rust](https://rustup.rs/) >= 1.77
-- [Tauri CLI prerequisites](https://v2.tauri.app/start/prerequisites/) (Windows: WebView2, VS Build Tools)
+### VNDB 元数据匹配
+从 VNDB 数据库搜索并一键导入：
 
-## 快速开始
+- **封面图**：拉取该作所有发行版的封面（实体正面 / 盘面 / 数字版），自由选择使用哪张
+- **截图**：自动下载游戏截图
+- **基本信息**：标题、原始标题、开发商、发售日
+- **评分数据**：VNDB 评分、投票数、平均游玩时长
+- **简介**：可借助 DeepSeek 自动翻译为简体中文
+- **类型标签**：通过 DeepSeek 从自定义标签库中智能匹配
+
+### DeepSeek AI
+- 自动翻译英文 / 日文游戏简介为简体中文
+- 根据 VNDB 标签从用户定义的标签库中匹配类型
+
+### 其他
+- 多主题配色切换
+- 截图灯箱，支持键盘左右键翻页
+- 一键打开游戏目录 / 存档目录
+- 网络请求自动使用系统代理（支持 HTTP / SOCKS5），DeepSeek 直连
+
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 桌面框架 | Tauri 2 |
+| 前端 | React 19 + TypeScript + Vite |
+| 样式 | Tailwind CSS |
+| 后端 | Rust（reqwest、serde、walkdir、sysinfo） |
+| 数据库 | SQLite（tauri-plugin-sql） |
+| AI | DeepSeek API（兼容 OpenAI 协议） |
+
+## 开发
+
+**环境要求**：Node.js ≥ 18、Rust 工具链、Tauri CLI 所需依赖（WebView2、VS Build Tools）
 
 ```bash
-# 1. 克隆或解压项目后进入目录
-cd galgame-manager
-
-# 2. 安装前端依赖
+# 安装依赖
 npm install
 
-# 3. 开发模式运行
+# 开发模式
 npm run tauri dev
 
-# 4. 构建发布版本
+# 构建
 npm run tauri build
 ```
 
 构建产物在 `src-tauri/target/release/bundle/` 目录下。
 
-## 项目结构
+## 设置
 
-```
-galgame-manager/
-├── src/                    # React 前端
-│   ├── components/         # UI 组件
-│   │   ├── GameCard.tsx    # 卡片视图的游戏卡片
-│   │   ├── GameListRow.tsx # 列表视图的行
-│   │   ├── GameDetail.tsx  # 游戏详情侧边栏
-│   │   ├── GameForm.tsx    # 添加/编辑表单
-│   │   ├── ScanDialog.tsx  # 扫描对话框
-│   │   └── Toolbar.tsx     # 工具栏(搜索/筛选/排序)
-│   ├── hooks/
-│   │   └── useGameLibrary.ts  # 游戏库状态管理
-│   ├── lib/
-│   │   ├── database.ts     # SQLite 数据库操作层
-│   │   └── utils.ts        # 工具函数
-│   ├── types/
-│   │   └── game.ts         # TypeScript 类型定义
-│   ├── App.tsx             # 主应用组件
-│   ├── main.tsx            # 入口
-│   └── styles.css          # 全局样式
-├── src-tauri/              # Rust 后端
-│   ├── src/
-│   │   ├── lib.rs          # Tauri commands (扫描/启动/存档检测)
-│   │   └── main.rs         # 入口
-│   ├── capabilities/
-│   │   └── default.json    # Tauri 权限配置
-│   ├── Cargo.toml
-│   └── tauri.conf.json     # Tauri 配置
-├── package.json
-├── vite.config.ts
-├── tailwind.config.js
-└── tsconfig.json
-```
+打开应用后进入「设置 → API 配置」：
 
-## 架构说明
+- **DeepSeek API Key**：用于简介翻译和标签匹配，可在 [platform.deepseek.com](https://platform.deepseek.com) 获取，留空则跳过翻译
+- 封面与截图下载自动使用系统代理，无需手动配置
 
-| 层 | 技术 | 作用 |
-|---|---|---|
-| 前端 | React 19 + TypeScript + Tailwind CSS | 用户界面 |
-| 后端 | Rust + Tauri 2 | 文件扫描、进程启动、系统调用 |
-| 数据库 | SQLite (tauri-plugin-sql) | 游戏元数据持久化 |
-| 通信 | Tauri IPC (invoke) | 前后端命令调用 |
-
-## 后续计划
-
-- [ ] VNDB API 自动匹配元数据
-- [ ] 游玩时间自动记录
-- [ ] 存档备份/恢复
-- [ ] Locale Emulator 转区启动集成
-- [ ] Bangumi 同步
-- [ ] 导入/导出游戏库
+进入「设置 → 标签库」可自定义 AI 匹配时使用的类型标签列表。
