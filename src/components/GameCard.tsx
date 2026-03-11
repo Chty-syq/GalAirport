@@ -189,11 +189,9 @@ export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning,
         <h3 className="text-sm font-medium text-text-primary truncate leading-tight">
           {game.title}
         </h3>
-        {game.developer && (
-          <p className="text-xs text-text-muted mt-0.5 truncate">
-            {game.developer}
-          </p>
-        )}
+        <p className="text-[10px] text-text-muted mt-0.5 truncate leading-tight">
+          {game.tags.length > 0 ? game.tags.join(" / ") : <span className="opacity-40">暂无标签</span>}
+        </p>
         <div className="flex items-center justify-between mt-2">
           {game.vndb_rating > 0 ? (
             <div className="flex items-center gap-1">

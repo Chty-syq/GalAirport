@@ -41,6 +41,9 @@ export interface VndbImage {
   dims: [number, number];
   sexual: number;
   violence: number;
+  // Release image extras
+  type?: string;       // "pkgfront" | "pkgback" | "pkgside" | "pkgmed" | "pkgcontent" | "dig"
+  thumbnail?: string;
 }
 
 export interface VndbTag {
@@ -187,6 +190,36 @@ async function fetchDevelopers(vnId: string): Promise<VndbProducer[]> {
   }
 }
 
+export async function fetchVnCovers(vnId: string): Promise<VndbImage[]> {
+  try {
+    const body = {
+      filters: ["vn", "=", ["id", "=", vnId]],
+      fields: "images.id, images.url, images.dims, images.sexual, images.violence, images.type, images.thumbnail",
+      results: 100,
+    };
+    const resp = await fetch(`${VNDB_API}/release`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const seen = new Set<string>();
+    const covers: VndbImage[] = [];
+    for (const release of data.results ?? []) {
+      for (const img of release.images ?? []) {
+        if (img.url && ["pkgfront", "pkgmed", "dig"].includes(img.type) && !seen.has(img.id)) {
+          seen.add(img.id);
+          covers.push(img as VndbImage);
+        }
+      }
+    }
+    return covers;
+  } catch {
+    return [];
+  }
+}
+
 // ─── Title Selection ───────────────────────────────────────────
 
 /**
@@ -260,5 +293,8 @@ export function cleanDescription(desc: string | null): string {
     .replace(/\[code\]([\s\S]*?)\[\/code\]/g, "$1")
     // .replace(/\[Edited from [^\]]*\]/gi, "")
     .replace(/\[[^\]]* from [^\]]*\]/gi, "")
+    .replace(/\[From [^\]]*\]/gi, "")
+    .replace(/【[^\]]* from [^\]]*】/gi, "")
+    .replace(/【From [^\]]*】/gi, "")
     .trim();
 }

@@ -9,6 +9,7 @@ export function useGameLibrary() {
   const [filterStatus, setFilterStatus] = useState<PlayStatus | "all">("all");
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterCollection, setFilterCollection] = useState<string | null>(null);
+  const [showAllGames, setShowAllGames] = useState(false);
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -116,11 +117,12 @@ export function useGameLibrary() {
 
   // Filtered & sorted games
   const filteredGames = games
-    // Collection filter: no collection selected → only unassigned; collection selected → that collection only
     .filter((g) =>
-      filterCollection === null
-        ? g.collection_id === null
-        : g.collection_id === filterCollection
+      filterCollection !== null
+        ? g.collection_id === filterCollection
+        : showAllGames
+        ? true
+        : g.collection_id === null
     )
     .filter((g) => filterStatus === "all" || g.play_status === filterStatus)
     .filter(
@@ -167,6 +169,8 @@ export function useGameLibrary() {
     setFilterTags,
     filterCollection,
     setFilterCollection,
+    showAllGames,
+    setShowAllGames,
     sortField,
     setSortField,
     sortDirection,

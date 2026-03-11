@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, Play, FolderOpen, Clock, Star, Tag, Globe, Edit, Users } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Play, FolderOpen, Clock, Star, Tag, Globe, Edit, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Game, PlayStatus } from "@/types/game";
 import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { StatusDropdown } from "@/components/StatusDropdown";
@@ -16,8 +16,20 @@ interface Props {
 }
 
 export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbMatch, onStatusChange }: Props) {
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [coverPad, setCoverPad] = useState<number | null>(null);
+  const screenshots = game.screenshots ?? [];
+
+  useEffect(() => {
+    if (lightboxIdx === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") setLightboxIdx((i) => (i !== null ? Math.max(0, i - 1) : null));
+      else if (e.key === "ArrowRight") setLightboxIdx((i) => (i !== null ? Math.min(screenshots.length - 1, i + 1) : null));
+      else if (e.key === "Escape") setLightboxIdx(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxIdx, screenshots.length]);
 
   const openFolder = async () => {
     await invoke("open_folder", { path: game.install_path });
@@ -190,15 +202,15 @@ export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbM
           )}
           
           {/* Screenshots */}
-          {game.screenshots && game.screenshots.length > 0 && (
+          {screenshots.length > 0 && (
             <div className="mt-4">
               <span className="text-xs text-text-muted block mb-2">截图</span>
               <div className="grid grid-cols-2 gap-2">
-                {game.screenshots.map((ss, i) => (
+                {screenshots.map((ss, i) => (
                   <div
                     key={i}
                     className="rounded-lg overflow-hidden bg-surface-2 aspect-video cursor-pointer"
-                    onClick={() => setLightboxImg(coverSrc(ss))}
+                    onClick={() => setLightboxIdx(i)}
                   >
                     <img
                       src={coverSrc(ss)}
@@ -272,23 +284,42 @@ export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbM
       </div>
 
       {/* Screenshot Lightbox */}
-      {lightboxImg && (
+      {lightboxIdx !== null && screenshots.length > 0 && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer"
-          onClick={() => setLightboxImg(null)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setLightboxIdx(null)}
         >
           <img
-            src={lightboxImg}
+            src={coverSrc(screenshots[lightboxIdx])}
             alt="截图放大"
             className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
           <button
-            onClick={() => setLightboxImg(null)}
+            onClick={() => setLightboxIdx(null)}
             className="absolute top-6 right-6 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
           >
             <X className="w-5 h-5 text-white" />
           </button>
+          {lightboxIdx > 0 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i !== null ? i - 1 : null)); }}
+              className="absolute left-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <ChevronLeft className="w-6 h-6 text-white" />
+            </button>
+          )}
+          {lightboxIdx < screenshots.length - 1 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i !== null ? i + 1 : null)); }}
+              className="absolute right-6 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+            >
+              <ChevronRight className="w-6 h-6 text-white" />
+            </button>
+          )}
+          <span className="absolute bottom-6 left-1/2 -translate-x-1/2 text-sm text-white/60">
+            {lightboxIdx + 1} / {screenshots.length}
+          </span>
         </div>
       )}
 

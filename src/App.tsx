@@ -156,6 +156,8 @@ function App() {
         collections={library.collections}
         filterCollection={library.filterCollection}
         onFilterCollection={library.setFilterCollection}
+        showAllGames={library.showAllGames}
+        onToggleShowAllGames={() => library.setShowAllGames((v) => !v)}
         allGames={library.allGames}
         onSettings={() => setShowSettings(true)}
         onHelp={() => setShowHelp(true)}

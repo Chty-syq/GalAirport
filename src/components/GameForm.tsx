@@ -70,10 +70,19 @@ export function GameForm({ game, onSave, onClose }: Props) {
   const set = <K extends keyof GameFormData>(key: K, value: GameFormData[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // Return the parent directory of a file path, or the path itself if it's already a directory
+  const parentDir = (p: string) => {
+    if (!p) return undefined;
+    const normalized = p.replace(/\\/g, "/");
+    const lastSlash = normalized.lastIndexOf("/");
+    return lastSlash > 0 ? p.slice(0, lastSlash) : undefined;
+  };
+
   const browseExe = async () => {
     const result = await open({
       title: "选择游戏可执行文件",
       filters: [{ name: "可执行文件", extensions: ["exe"] }],
+      defaultPath: parentDir(form.exe_path) ?? (form.install_path || undefined),
     });
     if (result) {
       const path = typeof result === "string" ? result : result;
@@ -91,7 +100,7 @@ export function GameForm({ game, onSave, onClose }: Props) {
   };
 
   const browseFolder = async (field: "install_path" | "save_path") => {
-    const result = await open({ directory: true, title: "选择文件夹" });
+    const result = await open({ directory: true, title: "选择文件夹", defaultPath: form[field] || undefined });
     if (result) {
       set(field, result as string);
     }
@@ -101,6 +110,7 @@ export function GameForm({ game, onSave, onClose }: Props) {
     const result = await open({
       title: "选择封面图片",
       filters: [{ name: "图片", extensions: ["png", "jpg", "jpeg", "webp", "bmp"] }],
+      defaultPath: parentDir(form.cover_path) ?? (form.install_path || undefined),
     });
     if (result) {
       set("cover_path", result as string);

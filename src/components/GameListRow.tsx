@@ -61,26 +61,22 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
         )}
       </div>
 
-      {/* Title, developer & tags */}
+      {/* Title & tags */}
       <div className="flex-1 min-w-0">
         <h3 className="text-sm font-medium text-text-primary truncate leading-snug">
           {game.title}
         </h3>
-        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-          <span className="text-xs text-text-muted truncate shrink-0 max-w-[140px]">
-            {game.developer || "未知开发商"}
-          </span>
-          {visibleTags.length > 0 && (
-            <span className="text-text-muted/30 text-xs flex-shrink-0">·</span>
-          )}
-          {visibleTags.map((tag) => (
+        <div className="flex items-center gap-1 mt-0.5 min-w-0">
+          {visibleTags.length > 0 ? visibleTags.map((tag) => (
             <span
               key={tag}
               className="inline-flex items-center px-1.5 py-px bg-accent/10 text-accent text-[10px] font-medium rounded-full border border-accent/15 leading-none flex-shrink-0"
             >
               {tag}
             </span>
-          ))}
+          )) : (
+            <span className="text-[10px] text-text-muted/40">暂无标签</span>
+          )}
         </div>
       </div>
 

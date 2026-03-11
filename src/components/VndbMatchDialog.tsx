@@ -10,18 +10,22 @@ import {
   Download,
   Tag,
   ExternalLink,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Game, GameFormData } from "@/types/game";
 import {
   searchVn,
   getVnById,
+  fetchVnCovers,
   extractTags,
   formatVndbDate,
   cleanDescription,
   pickDisplayTitle,
   pickOriginalTitle,
   type VndbVn,
+  type VndbImage,
 } from "@/lib/vndb";
 import { translateDescription, matchGenreTags } from "@/lib/deepseek";
 import * as database from "@/lib/database";
@@ -43,18 +47,39 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lightboxImg, setLightboxImg] = useState<string | null>(null);
+
+  // Cover selection
+  const [allCovers, setAllCovers] = useState<VndbImage[]>([]);
+  const [selectedCoverId, setSelectedCoverId] = useState<string | null>(null);
+
+  // Screenshot lightbox
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   // Auto-search on mount
   useEffect(() => {
     if (query.trim()) doSearch();
   }, []);
 
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    if (lightboxIdx === null || !selectedVn) return;
+    const screenshots = selectedVn.screenshots ?? [];
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") setLightboxIdx((i) => (i !== null ? Math.max(0, i - 1) : null));
+      else if (e.key === "ArrowRight") setLightboxIdx((i) => (i !== null ? Math.min(screenshots.length - 1, i + 1) : null));
+      else if (e.key === "Escape") setLightboxIdx(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [lightboxIdx, selectedVn]);
+
   const doSearch = async () => {
     if (!query.trim()) return;
     setSearching(true);
     setError(null);
     setSelectedVn(null);
+    setAllCovers([]);
+    setSelectedCoverId(null);
     try {
       const res = await searchVn(query.trim());
       setResults(res.results);
@@ -70,27 +95,47 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
   };
 
   const selectVn = async (vn: VndbVn) => {
-    // Show partial data immediately — no freezing
     setSelectedVn(vn);
+    // Immediately show the main image — don't wait for async
+    const initialCovers: VndbImage[] = vn.image ? [vn.image] : [];
+    setAllCovers(initialCovers);
+    setSelectedCoverId(vn.image?.id ?? null);
     setLoadingDetail(true);
     try {
-      const detail = await getVnById(vn.id);
+      const [detail, covers] = await Promise.all([
+        getVnById(vn.id),
+        fetchVnCovers(vn.id),
+      ]);
       if (detail) setSelectedVn(detail);
+      // Merge main image + release covers, deduplicate
+      const mainImg = detail?.image ?? vn.image;
+      const seen = new Set<string>();
+      const merged: VndbImage[] = [];
+      if (mainImg) { seen.add(mainImg.id); merged.push(mainImg); }
+      for (const c of covers) {
+        if (!seen.has(c.id)) { seen.add(c.id); merged.push(c); }
+      }
+      setAllCovers(merged);
+      // Keep current selection if it's still in the merged list; else reset to main
+      setSelectedCoverId((prev) =>
+        merged.find((c) => c.id === prev) ? prev : (mainImg?.id ?? null)
+      );
     } catch {
-      // Keep partial data already displayed
+      // keep partial data
     } finally {
       setLoadingDetail(false);
     }
   };
+
+  const selectedCover = allCovers.find((c) => c.id === selectedCoverId) ?? selectedVn?.image ?? null;
 
   const handleApply = async () => {
     if (!selectedVn) return;
     setApplying(true);
 
     try {
-      const [apiKey, proxyUrl, genreTags] = await Promise.all([
+      const [apiKey, genreTags] = await Promise.all([
         database.getSetting("deepseek_api_key"),
-        database.getSetting("proxy_url"),
         database.getGenreTags(),
       ]);
 
@@ -99,15 +144,14 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
           ? selectedVn.developers.map((d) => d.name).join(", ")
           : game.developer;
 
-      // Run cover, screenshots, description translation, tag translation in PARALLEL
       const coverPromise = (async () => {
-        if (selectedVn.image?.url) {
+        if (selectedCover?.url) {
           try {
-            const ext = selectedVn.image.url.split(".").pop() || "jpg";
+            const ext = selectedCover.url.split(".").pop() || "jpg";
             return await invoke<string>("download_cover", {
-              url: selectedVn.image.url,
-              filename: `${selectedVn.id}.${ext}`,
-              proxyUrl,
+              url: selectedCover.url,
+              filename: `${selectedCover.id}.${ext}`,
+              proxyUrl: "",
             });
           } catch (err) {
             toast("error", `「${selectedVn.title}」封面下载失败: ${err}`);
@@ -118,11 +162,10 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
 
       const screenshotsPromise = (async () => {
         if (!selectedVn.screenshots?.length) return [];
-        const safe = selectedVn.screenshots.filter((s) => s.sexual < 1 && s.violence < 1).slice(0, 4);
         const results = await Promise.allSettled(
-          safe.map((ss) => {
+          selectedVn.screenshots.slice(0, 6).map((ss) => {
             const ext = ss.url.split(".").pop() || "jpg";
-            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl });
+            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl: "" });
           })
         );
         return results
@@ -185,6 +228,8 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
       setApplying(false);
     }
   };
+
+  const screenshots = selectedVn?.screenshots ?? [];
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center">
@@ -274,7 +319,6 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                         : "hover:bg-surface-2 border border-transparent"
                     )}
                   >
-                    {/* Thumbnail */}
                     <div className="w-12 h-16 rounded overflow-hidden bg-surface-3 flex-shrink-0">
                       {vn.image?.url ? (
                         <img
@@ -329,14 +373,61 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
           <div className="w-1/2 overflow-y-auto">
             {selectedVn ? (
               <div className="p-4 space-y-4">
-                {/* Cover preview */}
-                {selectedVn.image?.url && (
-                  <div className="rounded-lg overflow-hidden bg-surface-2">
-                    <img
-                      src={selectedVn.image.url}
-                      alt={selectedVn.title}
-                      className="w-full max-h-64 object-contain bg-surface-3"
-                    />
+                {/* Cover picker */}
+                {(allCovers.length > 0 || selectedVn.image?.url) && (
+                  <div>
+                    {/* Selected cover preview */}
+                    <div className="rounded-lg overflow-hidden bg-surface-2 mb-2">
+                      <img
+                        src={selectedCover?.url ?? selectedVn.image?.url}
+                        alt={selectedVn.title}
+                        className="w-full max-h-64 object-contain bg-surface-3"
+                      />
+                    </div>
+
+                    {/* Cover thumbnail strip — shown once at least 1 cover is available */}
+                    <div>
+                      <span className="text-[10px] text-text-muted flex items-center gap-1 mb-1.5">
+                        选择封面
+                        {loadingDetail ? (
+                          <>
+                            <Loader2 className="w-3 h-3 text-accent animate-spin" />
+                            <span>加载中...</span>
+                          </>
+                        ) : (
+                          <span>（{allCovers.length} 张）</span>
+                        )}
+                      </span>
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {allCovers.map((c) => {
+                          const typeLabel = c.type === "dig" ? "数字" : c.type === "pkgmed" ? "盘面" : null;
+                          return (
+                            <button
+                              key={c.id}
+                              onClick={() => setSelectedCoverId(c.id)}
+                              title={c.type === "pkgfront" ? "实体封面" : c.type === "pkgmed" ? "盘面" : "数字版"}
+                              className={cn(
+                                "relative flex-shrink-0 w-14 h-20 rounded overflow-hidden border-2 transition-all",
+                                selectedCoverId === c.id
+                                  ? "border-accent shadow-sm shadow-accent/30 scale-[1.03]"
+                                  : "border-transparent opacity-70 hover:opacity-100 hover:border-surface-4"
+                              )}
+                            >
+                              <img src={c.url} alt="" className="w-full h-full object-cover" />
+                              {typeLabel && (
+                                <span className="absolute bottom-0 left-0 right-0 text-center text-[8px] bg-black/60 text-white/80 py-0.5">
+                                  {typeLabel}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                        {/* Loading placeholder thumbnails */}
+                        {loadingDetail && allCovers.length < 2 && (
+                          <div className="flex-shrink-0 w-14 h-20 rounded bg-surface-3 animate-pulse" />
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -426,7 +517,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                   )}
                 </div>
 
-                {/* VNDB 原始标签（供参考；实际导入标签由 DeepSeek 从标签库匹配） */}
+                {/* VNDB tags */}
                 {selectedVn.tags && selectedVn.tags.length > 0 && (
                   <div>
                     <span className="text-xs text-text-muted flex items-center gap-1 mb-1.5">
@@ -456,27 +547,26 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                   </div>
                 )}
 
-                {/* VNDB Screenshots */}
-                {selectedVn.screenshots && selectedVn.screenshots.filter((s) => s.sexual < 1 && s.violence < 1).length > 0 && (
+                {/* Screenshots */}
+                {screenshots.length > 0 && (
                   <div>
-                    <span className="text-xs text-text-muted block mb-2">截图预览</span>
+                    <span className="text-xs text-text-muted block mb-2">
+                      截图预览（{screenshots.length} 张）
+                    </span>
                     <div className="grid grid-cols-2 gap-2">
-                      {selectedVn.screenshots
-                        .filter((s) => s.sexual < 1 && s.violence < 1)
-                        .slice(0, 4)
-                        .map((ss) => (
-                          <div
-                            key={ss.id}
-                            className="rounded-lg overflow-hidden bg-surface-2 aspect-video cursor-pointer"
-                            onClick={() => setLightboxImg(ss.url)}
-                          >
-                            <img
-                              src={ss.url}
-                              alt=""
-                              className="w-full h-full object-cover hover:opacity-80 transition-opacity"
-                            />
-                          </div>
-                        ))}
+                      {screenshots.map((ss, i) => (
+                        <div
+                          key={ss.id}
+                          className="rounded-lg overflow-hidden bg-surface-2 aspect-video cursor-pointer"
+                          onClick={() => setLightboxIdx(i)}
+                        >
+                          <img
+                            src={ss.url}
+                            alt=""
+                            className="w-full h-full object-cover hover:opacity-80 transition-opacity"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -492,9 +582,9 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                       <p>✓ 开发商</p>
                     )}
                     {selectedVn.released && <p>✓ 发售日期</p>}
-                    {selectedVn.image?.url && <p>✓ 封面图片（自动下载）</p>}
-                    {selectedVn.screenshots?.filter((s) => s.sexual < 1 && s.violence < 1).length > 0 && (
-                      <p>✓ 截图（自动下载，最多 4 张）</p>
+                    {selectedCover?.url && <p>✓ 封面图片（已选择，自动下载）</p>}
+                    {screenshots.length > 0 && (
+                      <p>✓ 截图（自动下载，最多 6 张）</p>
                     )}
                     {selectedVn.tags?.length > 0 && <p>✓ 标签（合并）</p>}
                     {!game.notes && selectedVn.description && (
@@ -513,23 +603,42 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
         </div>
 
         {/* Screenshot Lightbox */}
-        {lightboxImg && (
+        {lightboxIdx !== null && screenshots.length > 0 && (
           <div
-            className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm cursor-pointer rounded-2xl"
-            onClick={() => setLightboxImg(null)}
+            className="absolute inset-0 z-10 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-2xl"
+            onClick={() => setLightboxIdx(null)}
           >
             <img
-              src={lightboxImg}
+              src={screenshots[lightboxIdx]?.url}
               alt="截图放大"
-              className="max-w-[90%] max-h-[85%] object-contain rounded-lg shadow-2xl"
+              className="max-w-[85%] max-h-[80%] object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             />
             <button
-              onClick={() => setLightboxImg(null)}
+              onClick={() => setLightboxIdx(null)}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
             >
               <X className="w-4 h-4 text-white" />
             </button>
+            {lightboxIdx > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i !== null ? i - 1 : null)); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5 text-white" />
+              </button>
+            )}
+            {lightboxIdx < screenshots.length - 1 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightboxIdx((i) => (i !== null ? i + 1 : null)); }}
+                className="absolute right-14 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <ChevronRight className="w-5 h-5 text-white" />
+              </button>
+            )}
+            <span className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-white/60">
+              {lightboxIdx + 1} / {screenshots.length}
+            </span>
           </div>
         )}
 

@@ -1,4 +1,4 @@
-import { Gamepad2, Tag, X, Settings, FolderOpen, HelpCircle } from "lucide-react";
+import { Gamepad2, Tag, X, Settings, FolderOpen, HelpCircle, Layers } from "lucide-react";
 import type { Collection, PlayStatus } from "@/types/game";
 import { cn } from "@/lib/utils";
 
@@ -17,14 +17,16 @@ interface Props {
   collections: Collection[];
   filterCollection: string | null;
   onFilterCollection: (id: string | null) => void;
+  showAllGames: boolean;
+  onToggleShowAllGames: () => void;
   allGames: { collection_id: string | null }[];
   onSettings: () => void;
   onHelp: () => void;
 }
 
 const STATUS_OPTIONS: { value: PlayStatus; label: string; dot: string }[] = [
-  { value: "playing", label: "游玩中", dot: "bg-status-playing" },
   { value: "unplayed", label: "未开始", dot: "bg-status-unplayed" },
+  { value: "playing", label: "游玩中", dot: "bg-status-playing" },
   { value: "finished", label: "已通关", dot: "bg-status-finished" },
   { value: "completed", label: "全线通关", dot: "bg-status-completed" },
 ];
@@ -39,6 +41,8 @@ export function Sidebar({
   collections,
   filterCollection,
   onFilterCollection,
+  showAllGames,
+  onToggleShowAllGames,
   allGames,
   onSettings,
   onHelp,
@@ -105,11 +109,24 @@ export function Sidebar({
 
       {/* Collection filter */}
       <div className="px-3 pb-2">
-        <div className="px-2 mb-1.5">
+        <div className="px-2 mb-1.5 flex items-center justify-between">
           <p className="text-[10px] font-medium text-text-muted/60 uppercase tracking-wider flex items-center gap-1">
             <FolderOpen className="w-3 h-3" />
             合集
           </p>
+          <button
+            onClick={onToggleShowAllGames}
+            title={showAllGames ? "点击：仅显示未分类" : "点击：显示全部游戏"}
+            className={cn(
+              "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors",
+              showAllGames
+                ? "bg-accent/15 text-accent"
+                : "text-text-muted/50 hover:text-text-muted"
+            )}
+          >
+            <Layers className="w-3 h-3" />
+            全部
+          </button>
         </div>
         {collections.length === 0 ? (
           <p className="text-[10px] text-text-muted/50 px-2 py-1">

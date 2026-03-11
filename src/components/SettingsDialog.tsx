@@ -14,7 +14,6 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const { theme, setTheme } = useTheme();
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
   const [deepseekKey, setDeepseekKey] = useState("");
-  const [proxyUrl, setProxyUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"success" | "fail" | null>(null);
@@ -30,8 +29,6 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
     (async () => {
       const key = await db.getSetting("deepseek_api_key");
       setDeepseekKey(key);
-      const proxy = await db.getSetting("proxy_url");
-      setProxyUrl(proxy);
       setLoading(false);
     })();
   }, []);
@@ -78,7 +75,6 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const handleSave = async () => {
     setSaving(true);
     await db.setSetting("deepseek_api_key", deepseekKey.trim());
-    await db.setSetting("proxy_url", proxyUrl.trim());
     setSaving(false);
     onClose();
   };
@@ -278,27 +274,10 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                     </div>
                   </div>
 
-                  {/* Proxy URL */}
-                  <div>
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-2">
-                      代理地址
-                    </label>
-                    <p className="text-[10px] text-text-muted mb-2">
-                      用于 VNDB 封面/截图下载。格式：<span className="text-accent">http://127.0.0.1:7890</span>。留空则不使用代理。
-                    </p>
-                    <input
-                      type="text"
-                      value={proxyUrl}
-                      onChange={(e) => setProxyUrl(e.target.value)}
-                      placeholder="http://127.0.0.1:7890"
-                      className="w-full px-3 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
-                    />
-                  </div>
-
                   {/* Info */}
                   <div className="p-3 bg-surface-2 rounded-lg text-[10px] text-text-muted space-y-1">
-                    <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（无需配置）</p>
-                    <p>• DeepSeek：翻译简介 + 从标签库中匹配类型标签（需要 API Key，不走代理）</p>
+                    <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（无需配置，自动使用系统代理）</p>
+                    <p>• DeepSeek：翻译简介 + 从标签库中匹配类型标签（需要 API Key，直连不走代理）</p>
                   </div>
                 </div>
               )}
