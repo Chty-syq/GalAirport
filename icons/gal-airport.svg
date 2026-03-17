@@ -1,0 +1,266 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Background gradient: dusk sky purple → deep blue -->
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a0a2e"/>
+      <stop offset="40%" stop-color="#3b1f6e"/>
+      <stop offset="100%" stop-color="#6b3fa0"/>
+    </linearGradient>
+    <!-- Glow for plane -->
+    <radialGradient id="planeGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffe4f7" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#ffe4f7" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Girl hair gradient -->
+    <linearGradient id="hairGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff8ecb"/>
+      <stop offset="100%" stop-color="#c45aff"/>
+    </linearGradient>
+    <!-- Skin tone -->
+    <linearGradient id="skinGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe0c8"/>
+      <stop offset="100%" stop-color="#ffcfae"/>
+    </linearGradient>
+    <!-- Uniform gradient -->
+    <linearGradient id="uniformGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5bc8fa"/>
+      <stop offset="100%" stop-color="#3a8fd4"/>
+    </linearGradient>
+    <!-- Runway gradient -->
+    <linearGradient id="runwayGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#c4b5fd"/>
+      <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0"/>
+    </linearGradient>
+    <!-- Star glow filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <!-- Clip to rounded square -->
+    <clipPath id="roundedClip">
+      <rect width="256" height="256" rx="52" ry="52"/>
+    </clipPath>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect width="256" height="256" rx="52" ry="52" fill="url(#bgGrad)"/>
+
+  <g clip-path="url(#roundedClip)">
+
+    <!-- Stars in sky -->
+    <g filter="url(#glow)" opacity="0.9">
+      <circle cx="24" cy="28" r="1.5" fill="white"/>
+      <circle cx="52" cy="18" r="1" fill="white"/>
+      <circle cx="80" cy="35" r="1.5" fill="white"/>
+      <circle cx="110" cy="20" r="1" fill="white"/>
+      <circle cx="145" cy="15" r="2" fill="#ffe4f7"/>
+      <circle cx="175" cy="30" r="1.5" fill="white"/>
+      <circle cx="210" cy="18" r="1" fill="white"/>
+      <circle cx="235" cy="40" r="1.5" fill="white"/>
+      <circle cx="195" cy="55" r="1" fill="white"/>
+      <circle cx="38" cy="55" r="1" fill="white"/>
+    </g>
+
+    <!-- Moon (crescent) top right -->
+    <g opacity="0.85">
+      <circle cx="218" cy="38" r="14" fill="#f0d8ff"/>
+      <circle cx="224" cy="32" r="11" fill="#3b1f6e"/>
+    </g>
+
+    <!-- Distant city / terminal silhouette at horizon -->
+    <!-- Control tower -->
+    <rect x="155" y="148" width="8" height="50" fill="#2d1060" opacity="0.7"/>
+    <rect x="150" y="145" width="18" height="8" rx="2" fill="#2d1060" opacity="0.7"/>
+    <rect x="157" y="140" width="4" height="8" fill="#2d1060" opacity="0.7"/>
+    <!-- Terminal building -->
+    <rect x="168" y="162" width="60" height="36" rx="3" fill="#1e0a50" opacity="0.7"/>
+    <rect x="165" y="158" width="66" height="8" rx="2" fill="#2d1060" opacity="0.6"/>
+    <!-- Terminal windows -->
+    <rect x="175" y="168" width="8" height="6" rx="1" fill="#7ee8fa" opacity="0.5"/>
+    <rect x="188" y="168" width="8" height="6" rx="1" fill="#7ee8fa" opacity="0.5"/>
+    <rect x="201" y="168" width="8" height="6" rx="1" fill="#7ee8fa" opacity="0.5"/>
+    <rect x="175" y="180" width="8" height="6" rx="1" fill="#7ee8fa" opacity="0.4"/>
+    <rect x="188" y="180" width="8" height="6" rx="1" fill="#7ee8fa" opacity="0.4"/>
+    <!-- Small buildings left -->
+    <rect x="22" y="170" width="20" height="28" rx="2" fill="#1e0a50" opacity="0.6"/>
+    <rect x="36" y="162" width="14" height="36" rx="2" fill="#2d1060" opacity="0.6"/>
+    <rect x="44" y="172" width="20" height="26" rx="2" fill="#1e0a50" opacity="0.5"/>
+    <!-- Windows left buildings -->
+    <rect x="27" y="175" width="5" height="4" rx="1" fill="#7ee8fa" opacity="0.4"/>
+    <rect x="27" y="183" width="5" height="4" rx="1" fill="#7ee8fa" opacity="0.3"/>
+    <rect x="40" y="168" width="5" height="4" rx="1" fill="#7ee8fa" opacity="0.4"/>
+
+    <!-- Runway at bottom center -->
+    <rect x="0" y="222" width="256" height="34" fill="#12043a" opacity="0.8"/>
+    <rect x="0" y="220" width="256" height="6" fill="url(#runwayGrad)" opacity="0.9"/>
+    <!-- Runway center dashes -->
+    <rect x="60" y="229" width="20" height="3" rx="1.5" fill="#c4b5fd" opacity="0.6"/>
+    <rect x="90" y="229" width="20" height="3" rx="1.5" fill="#c4b5fd" opacity="0.6"/>
+    <rect x="120" y="229" width="20" height="3" rx="1.5" fill="#c4b5fd" opacity="0.6"/>
+    <rect x="150" y="229" width="20" height="3" rx="1.5" fill="#c4b5fd" opacity="0.6"/>
+    <rect x="180" y="229" width="20" height="3" rx="1.5" fill="#c4b5fd" opacity="0.6"/>
+    <!-- Runway edge lights -->
+    <circle cx="30" cy="222" r="2" fill="#ffe066" opacity="0.8"/>
+    <circle cx="70" cy="222" r="2" fill="#ffe066" opacity="0.8"/>
+    <circle cx="110" cy="222" r="2" fill="#ffe066" opacity="0.8"/>
+    <circle cx="150" cy="222" r="2" fill="#ffe066" opacity="0.8"/>
+    <circle cx="190" cy="222" r="2" fill="#ffe066" opacity="0.8"/>
+    <circle cx="230" cy="222" r="2" fill="#ffe066" opacity="0.8"/>
+
+    <!-- Airplane taking off (upper right area) -->
+    <g transform="translate(155, 72) rotate(-22)" filter="url(#softglow)">
+      <!-- Fuselage -->
+      <ellipse cx="0" cy="0" rx="28" ry="7" fill="white" opacity="0.95"/>
+      <!-- Nose -->
+      <ellipse cx="25" cy="0" rx="8" ry="5" fill="#f0f0f0" opacity="0.9"/>
+      <!-- Tail fin -->
+      <polygon points="-24,-7 -20,-18 -15,-7" fill="white" opacity="0.9"/>
+      <!-- Main wings -->
+      <polygon points="-5,-7 10,-7 18,14 0,10" fill="white" opacity="0.9"/>
+      <polygon points="-5,7 10,7 18,-14 0,-10" fill="white" opacity="0.9"/>
+      <!-- Windows row -->
+      <rect x="-8" y="-3" width="5" height="4" rx="1" fill="#a8e6ff" opacity="0.8"/>
+      <rect x="-1" y="-3" width="5" height="4" rx="1" fill="#a8e6ff" opacity="0.8"/>
+      <rect x="6" y="-3" width="5" height="4" rx="1" fill="#a8e6ff" opacity="0.8"/>
+      <!-- Engine glow trail -->
+      <ellipse cx="-30" cy="5" rx="6" ry="2" fill="#ffe4f7" opacity="0.5"/>
+      <ellipse cx="-30" cy="-5" rx="6" ry="2" fill="#ffe4f7" opacity="0.5"/>
+    </g>
+
+    <!-- Contrail / flight path -->
+    <path d="M 100,105 Q 130,95 155,88" stroke="#e8d5ff" stroke-width="1.5" fill="none" stroke-dasharray="4,5" opacity="0.5"/>
+
+    <!-- ===== ANIME GIRL ===== -->
+    <!-- Position: center-left, standing at runway -->
+
+    <!-- Body shadow -->
+    <ellipse cx="100" cy="218" rx="22" ry="4" fill="#0a0020" opacity="0.4"/>
+
+    <!-- Legs (skirt/uniform) -->
+    <!-- Left leg -->
+    <rect x="90" y="196" width="9" height="22" rx="4" fill="#ffe0c8"/>
+    <!-- Right leg -->
+    <rect x="101" y="196" width="9" height="22" rx="4" fill="#ffcfae"/>
+    <!-- Shoes -->
+    <ellipse cx="94" cy="218" rx="6" ry="3" fill="#2d1060"/>
+    <ellipse cx="106" cy="218" rx="6" ry="3" fill="#2d1060"/>
+
+    <!-- Skirt (flight attendant style) -->
+    <path d="M 82,175 Q 82,198 88,200 Q 100,203 112,200 Q 118,198 118,175 Z" fill="#3a8fd4" opacity="0.95"/>
+    <!-- Skirt highlight -->
+    <path d="M 88,175 Q 87,192 90,197 Q 96,200 100,200" stroke="#5bc8fa" stroke-width="1.5" fill="none" opacity="0.6"/>
+
+    <!-- Uniform jacket body -->
+    <path d="M 84,140 Q 80,160 82,175 L 118,175 Q 120,160 116,140 Q 108,135 100,134 Q 92,135 84,140 Z"
+          fill="url(#uniformGrad)"/>
+    <!-- Jacket lapels / collar -->
+    <path d="M 100,138 L 93,148 L 100,152 L 107,148 Z" fill="white" opacity="0.9"/>
+    <!-- Jacket buttons -->
+    <circle cx="100" cy="155" r="1.5" fill="white" opacity="0.8"/>
+    <circle cx="100" cy="162" r="1.5" fill="white" opacity="0.8"/>
+    <circle cx="100" cy="169" r="1.5" fill="white" opacity="0.8"/>
+    <!-- Jacket trim / stripes on shoulders -->
+    <rect x="82" y="141" width="8" height="3" rx="1" fill="#ffe066" opacity="0.9"/>
+    <rect x="110" y="141" width="8" height="3" rx="1" fill="#ffe066" opacity="0.9"/>
+    <!-- Necktie / scarf -->
+    <polygon points="100,145 96,152 100,155 104,152" fill="#ff6eb4" opacity="0.95"/>
+
+    <!-- Right arm (raised, holding something) -->
+    <path d="M 116,145 Q 128,138 132,128" stroke="url(#skinGrad)" stroke-width="8" stroke-linecap="round" fill="none"/>
+    <!-- Sleeve -->
+    <path d="M 116,145 Q 126,140 130,132" stroke="#5bc8fa" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <!-- Hand -->
+    <circle cx="133" cy="126" r="5" fill="#ffe0c8"/>
+    <!-- Small flag / boarding pass she's holding -->
+    <rect x="134" y="116" width="12" height="9" rx="1" fill="#ffe066" opacity="0.9"/>
+    <line x1="134" y1="116" x2="134" y2="125" stroke="#c8a800" stroke-width="1.5"/>
+
+    <!-- Left arm (down, relaxed) -->
+    <path d="M 84,145 Q 76,160 75,172" stroke="#5bc8fa" stroke-width="7" stroke-linecap="round" fill="none"/>
+    <path d="M 84,147 Q 77,161 76,172" stroke="url(#skinGrad)" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <circle cx="75" cy="174" r="5" fill="#ffe0c8"/>
+    <!-- Small bag in left hand -->
+    <rect x="68" y="172" width="10" height="8" rx="2" fill="#c45aff" opacity="0.9"/>
+
+    <!-- Neck -->
+    <rect x="96" y="126" width="8" height="14" rx="4" fill="#ffe0c8"/>
+
+    <!-- Head -->
+    <ellipse cx="100" cy="114" rx="20" ry="22" fill="#ffe0c8"/>
+
+    <!-- Hair back layer (long, flowing) -->
+    <path d="M 82,100 Q 70,120 68,150 Q 72,170 78,175 Q 82,155 84,135 Q 88,115 88,100 Z"
+          fill="url(#hairGrad)" opacity="0.9"/>
+    <path d="M 118,100 Q 130,120 132,150 Q 128,170 122,175 Q 118,155 116,135 Q 112,115 112,100 Z"
+          fill="url(#hairGrad)" opacity="0.9"/>
+
+    <!-- Hair front / top -->
+    <path d="M 82,105 Q 80,90 88,82 Q 96,76 104,76 Q 114,76 120,84 Q 126,92 122,105
+             Q 116,95 108,92 Q 100,90 92,93 Q 86,97 82,105 Z"
+          fill="url(#hairGrad)"/>
+    <!-- Hair side strands -->
+    <path d="M 82,105 Q 76,115 78,128 Q 80,122 84,115 Z" fill="#ff8ecb"/>
+    <path d="M 118,105 Q 124,115 122,128 Q 120,122 116,115 Z" fill="#c45aff"/>
+
+    <!-- Face features -->
+    <!-- Eyes -->
+    <!-- Left eye -->
+    <ellipse cx="92" cy="114" rx="5" ry="5.5" fill="#1a0060"/>
+    <ellipse cx="92" cy="114" rx="3.5" ry="4" fill="#7b2fff"/>
+    <ellipse cx="92" cy="114" rx="2" ry="2.5" fill="#b06fff"/>
+    <circle cx="90.5" cy="112" r="1.5" fill="white" opacity="0.9"/>
+    <!-- Left eyelashes top -->
+    <path d="M 87,110 Q 92,107 97,110" stroke="#1a0060" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- Right eye -->
+    <ellipse cx="108" cy="114" rx="5" ry="5.5" fill="#1a0060"/>
+    <ellipse cx="108" cy="114" rx="3.5" ry="4" fill="#7b2fff"/>
+    <ellipse cx="108" cy="114" rx="2" ry="2.5" fill="#b06fff"/>
+    <circle cx="106.5" cy="112" r="1.5" fill="white" opacity="0.9"/>
+    <!-- Right eyelashes top -->
+    <path d="M 103,110 Q 108,107 113,110" stroke="#1a0060" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+
+    <!-- Blush -->
+    <ellipse cx="87" cy="120" rx="5" ry="3" fill="#ffb3cc" opacity="0.5"/>
+    <ellipse cx="113" cy="120" rx="5" ry="3" fill="#ffb3cc" opacity="0.5"/>
+
+    <!-- Nose (small) -->
+    <path d="M 99,120 Q 100,122 101,120" stroke="#e8a07a" stroke-width="1" fill="none"/>
+
+    <!-- Mouth (smile) -->
+    <path d="M 96,125 Q 100,129 104,125" stroke="#e8607a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+
+    <!-- Captain's hat (flight attendant cap) -->
+    <ellipse cx="100" cy="96" rx="22" ry="5" fill="#2d5a9e"/>
+    <rect x="84" y="86" width="32" height="12" rx="3" fill="#3a6fd4"/>
+    <!-- Hat brim -->
+    <rect x="80" y="94" width="40" height="4" rx="2" fill="#2d5a9e"/>
+    <!-- Hat badge / emblem -->
+    <ellipse cx="100" cy="90" rx="7" ry="5" fill="#1a3a80"/>
+    <polygon points="100,86 101.5,89 105,89 102.5,91 103.5,94 100,92 96.5,94 97.5,91 95,89 98.5,89"
+             fill="#ffe066" opacity="0.95"/>
+
+    <!-- Hair ribbon / decorative element -->
+    <path d="M 120,100 Q 128,96 124,104 Q 120,100 128,104 Q 128,96 120,100 Z" fill="#ff6eb4" opacity="0.9"/>
+
+    <!-- Sparkles / stars near girl -->
+    <g filter="url(#glow)" opacity="0.9">
+      <polygon points="66,88 67.5,93 72,93 68.5,96 70,101 66,98 62,101 63.5,96 60,93 64.5,93"
+               fill="#ffe066" transform="scale(0.5) translate(66,90)"/>
+      <polygon points="140,80 141,83 144,83 141.5,85 142.5,88 140,86 137.5,88 138.5,85 136,83 139,83"
+               fill="#ff8ecb" transform="scale(0.6) translate(90,48)"/>
+    </g>
+    <circle cx="68" cy="94" r="2" fill="#ffe066" opacity="0.8" filter="url(#glow)"/>
+    <circle cx="72" cy="88" r="1.5" fill="#ff8ecb" opacity="0.9" filter="url(#glow)"/>
+    <circle cx="130" cy="108" r="2" fill="#7ee8fa" opacity="0.8" filter="url(#glow)"/>
+
+    <!-- "GalAirport" text at bottom -->
+    <text x="128" y="248" font-family="'Arial', sans-serif" font-size="11" font-weight="bold"
+          fill="#e8d5ff" text-anchor="middle" letter-spacing="1" opacity="0.85">GalAirport</text>
+
+  </g>
+</svg>
