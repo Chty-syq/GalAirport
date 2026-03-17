@@ -17,6 +17,7 @@ import { VndbMatchDialog } from "@/components/VndbMatchDialog";
 import { SettingsDialog } from "@/components/SettingsDialog";
 import { CollectionManagerDialog } from "@/components/CollectionDialog";
 import { HelpDialog } from "@/components/HelpDialog";
+import { WalkthroughDialog } from "@/components/WalkthroughDialog";
 
 function App() {
   const library = useGameLibrary();
@@ -31,6 +32,7 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showCollectionDialog, setShowCollectionDialog] = useState(false);
   const [runningGameId, setRunningGameId] = useState<string | null>(null);
+  const [walkthroughGame, setWalkthroughGame] = useState<Game | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
@@ -261,6 +263,7 @@ function App() {
                     isSelected={selectedIds.has(game.id)}
                     onToggleSelect={toggleSelectGame}
                     onStatusChange={handleStatusChange}
+                    onWalkthrough={setWalkthroughGame}
                   />
                 ))}
               </div>
@@ -279,6 +282,7 @@ function App() {
                     isSelected={selectedIds.has(game.id)}
                     onToggleSelect={toggleSelectGame}
                     onStatusChange={handleStatusChange}
+                    onWalkthrough={setWalkthroughGame}
                   />
                 ))}
               </div>
@@ -311,6 +315,13 @@ function App() {
             setSelectedGame(null);
             setVndbMatchGame(game);
           }}
+        />
+      )}
+
+      {walkthroughGame && (
+        <WalkthroughDialog
+          game={walkthroughGame}
+          onClose={() => setWalkthroughGame(null)}
         />
       )}
 

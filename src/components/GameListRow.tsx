@@ -1,4 +1,4 @@
-import { Play, Star, Clock, Edit, Trash2, Check, Globe } from "lucide-react";
+import { Play, Star, Clock, Edit, Trash2, Check, Globe, GitBranch } from "lucide-react";
 import type { Game, PlayStatus } from "@/types/game";
 import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { StatusDropdown } from "@/components/StatusDropdown";
@@ -14,9 +14,10 @@ interface Props {
   isSelected?: boolean;
   onToggleSelect?: (id: string) => void;
   onStatusChange?: (id: string, status: PlayStatus) => void;
+  onWalkthrough?: (game: Game) => void;
 }
 
-export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunning, selectionMode, isSelected, onToggleSelect, onStatusChange }: Props) {
+export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunning, selectionMode, isSelected, onToggleSelect, onStatusChange, onWalkthrough }: Props) {
   const handleLaunch = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!isRunning) onLaunch(game);
@@ -134,6 +135,16 @@ export function GameListRow({ game, onEdit, onDelete, onClick, onLaunch, isRunni
           title={isRunning ? "游戏运行中" : "启动游戏"}
         >
           <Play className="w-3.5 h-3.5 text-accent" fill="currentColor" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onWalkthrough?.(game);
+          }}
+          className="w-8 h-8 rounded-lg hover:bg-surface-3 flex items-center justify-center transition-colors"
+          title="攻略图"
+        >
+          <GitBranch className="w-3.5 h-3.5 text-text-secondary" />
         </button>
         <button
           onClick={(e) => {

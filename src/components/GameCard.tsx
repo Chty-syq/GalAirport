@@ -1,4 +1,4 @@
-import { Play, Star, Clock, MoreVertical, Trash2, Edit, FolderOpen, Save, Check } from "lucide-react";
+import { Play, Star, Clock, MoreVertical, Trash2, Edit, FolderOpen, Save, Check, GitBranch } from "lucide-react";
 import type { Game, PlayStatus } from "@/types/game";
 import { formatPlaytime, cn, coverSrc } from "@/lib/utils";
 import { StatusDropdown } from "@/components/StatusDropdown";
@@ -17,9 +17,10 @@ interface Props {
   isSelected?: boolean;
   onToggleSelect?: (id: string) => void;
   onStatusChange?: (id: string, status: PlayStatus) => void;
+  onWalkthrough?: (game: Game) => void;
 }
 
-export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning, selectionMode, isSelected, onToggleSelect, onStatusChange }: Props) {
+export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning, selectionMode, isSelected, onToggleSelect, onStatusChange, onWalkthrough }: Props) {
   const { toast } = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -167,6 +168,16 @@ export function GameCard({ game, onEdit, onDelete, onClick, onLaunch, isRunning,
                 }}
               >
                 <Save className="w-3.5 h-3.5" /> 打开存档
+              </button>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-4 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onWalkthrough?.(game);
+                  setMenuOpen(false);
+                }}
+              >
+                <GitBranch className="w-3.5 h-3.5" /> 攻略图
               </button>
               <hr className="border-surface-4 my-1" />
               <button

@@ -623,6 +623,62 @@ async fn deepseek_match_tags(
     Ok(matched.into_iter().filter(|t| genre_set.contains(t.as_str())).collect())
 }
 
+/// 根据用户描述生成 Mermaid 攻略流程图代码
+#[tauri::command]
+async fn deepseek_generate_mermaid(
+    api_key: String,
+    prompt: String,
+    game_title: String,
+) -> Result<String, String> {
+    let client = build_deepseek_client(&api_key)?;
+
+    let req = CreateChatCompletionRequestArgs::default()
+        .model("deepseek-chat")
+        .temperature(0.3)
+        .max_tokens(2048u32)
+        .messages(vec![
+            ChatCompletionRequestSystemMessageArgs::default()
+                .content(
+                    "你是视觉小说攻略流程图专家。根据用户描述，生成 Mermaid flowchart 代码。\n\
+                     节点类型规范（严格遵守，影响渲染样式）：\n\
+                     - 游戏开始：([开始]) — 使用 ([ ]) 体育场形\n\
+                     - 玩家选项：[文字] — 使用 [ ] 矩形\n\
+                     - 人物支线：{文字} — 使用 { } 菱形\n\
+                     - 结局：((结局名)) — 使用 (( )) 圆形\n\
+                     输出规则：\n\
+                     1. 只输出 Mermaid 代码，不加任何解释或 markdown 围栏\n\
+                     2. 第一行必须是 flowchart TD\n\
+                     3. 节点 ID 用英文，节点文字用中文\n\
+                     4. 节点数量尽量少，层次清晰"
+                )
+                .build().map_err(|e| e.to_string())?.into(),
+            ChatCompletionRequestUserMessageArgs::default()
+                .content(format!("游戏：{}\n攻略描述：{}", game_title, prompt))
+                .build().map_err(|e| e.to_string())?.into(),
+        ])
+        .build().map_err(|e| e.to_string())?;
+
+    let raw = client.chat().create(req).await
+        .map_err(|e| format!("DeepSeek 请求失败: {}", e))?
+        .choices.first()
+        .and_then(|c| c.message.content.clone())
+        .unwrap_or_default();
+
+    // 去除 markdown 代码块围栏（```mermaid ... ``` 或 ``` ... ```）
+    let code = if let Some(s) = raw.find("```") {
+        let after = &raw[s + 3..];
+        let body_start = after.find('\n').map(|i| i + 1).unwrap_or(0);
+        let body = &after[body_start..];
+        body.find("```")
+            .map(|e| body[..e].trim().to_string())
+            .unwrap_or_else(|| body.trim().to_string())
+    } else {
+        raw.trim().to_string()
+    };
+
+    Ok(code)
+}
+
 // ─── 应用入口 ────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -648,6 +704,7 @@ pub fn run() {
             deepseek_translate,
             deepseek_test,
             deepseek_match_tags,
+            deepseek_generate_mermaid,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 应用启动失败");
