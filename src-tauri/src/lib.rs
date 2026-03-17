@@ -411,6 +411,23 @@ async fn deepseek_test(api_key: String) -> Result<bool, String> {
     Ok(client.chat().create(req).await.is_ok())
 }
 
+/// 测试 VNDB 连接（使用指定代理），返回延迟毫秒数
+#[tauri::command]
+async fn test_vndb_connection(proxy_url: String) -> Result<u64, String> {
+    let client = build_proxy_client(&proxy_url)?;
+    let start = std::time::Instant::now();
+    match client
+        .get("https://api.vndb.org/kana/stats")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => Ok(start.elapsed().as_millis() as u64),
+        Ok(resp) => Err(format!("HTTP {}", resp.status().as_u16())),
+        Err(e) => Err(format!("连接失败: {}", e)),
+    }
+}
+
 /// 将 VNDB 英文标签与用户配置的类型标签库匹配，返回适用的标签（零个或多个）
 #[tauri::command]
 async fn deepseek_match_tags(
@@ -479,6 +496,7 @@ pub fn run() {
             find_save_directories,
             download_cover,
             download_screenshot,
+            test_vndb_connection,
             deepseek_translate,
             deepseek_test,
             deepseek_match_tags,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw } from "lucide-react";
+import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw, Globe } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import * as db from "@/lib/database";
 import { testApiKey } from "@/lib/deepseek";
 import { useTheme, THEME_LIST } from "@/hooks/useTheme";
@@ -14,9 +15,14 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const { theme, setTheme } = useTheme();
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
   const [deepseekKey, setDeepseekKey] = useState("");
+  const [proxyUrl, setProxyUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"success" | "fail" | null>(null);
+  const [testingVndb, setTestingVndb] = useState(false);
+  const [vndbTestResult, setVndbTestResult] = useState<"success" | "fail" | null>(null);
+  const [vndbLatency, setVndbLatency] = useState<number | null>(null);
+  const [vndbTestError, setVndbTestError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Genre tag library state
@@ -27,8 +33,12 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
 
   useEffect(() => {
     (async () => {
-      const key = await db.getSetting("deepseek_api_key");
+      const [key, proxy] = await Promise.all([
+        db.getSetting("deepseek_api_key"),
+        db.getSetting("proxy_url"),
+      ]);
       setDeepseekKey(key);
+      setProxyUrl(proxy);
       setLoading(false);
     })();
   }, []);
@@ -72,9 +82,28 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
     setTesting(false);
   };
 
+  const handleTestVndb = async () => {
+    setTestingVndb(true);
+    setVndbTestResult(null);
+    setVndbLatency(null);
+    setVndbTestError(null);
+    try {
+      const ms = await invoke<number>("test_vndb_connection", { proxyUrl: proxyUrl.trim() });
+      setVndbLatency(ms);
+      setVndbTestResult("success");
+    } catch (e) {
+      setVndbTestResult("fail");
+      setVndbTestError(String(e));
+    }
+    setTestingVndb(false);
+  };
+
   const handleSave = async () => {
     setSaving(true);
-    await db.setSetting("deepseek_api_key", deepseekKey.trim());
+    await Promise.all([
+      db.setSetting("deepseek_api_key", deepseekKey.trim()),
+      db.setSetting("proxy_url", proxyUrl.trim()),
+    ]);
     setSaving(false);
     onClose();
   };
@@ -274,9 +303,52 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                     </div>
                   </div>
 
+                  {/* Proxy */}
+                  <div>
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-text-secondary mb-2">
+                      <Globe className="w-3.5 h-3.5" />
+                      代理设置
+                    </label>
+                    <p className="text-[10px] text-text-muted mb-2">
+                      用于访问 VNDB 及下载封面/截图。留空则自动使用系统代理。
+                      支持格式：<span className="text-accent">http://host:port</span>、<span className="text-accent">socks5://host:port</span>
+                    </p>
+                    <input
+                      type="text"
+                      value={proxyUrl}
+                      onChange={(e) => {
+                        setProxyUrl(e.target.value);
+                        setVndbTestResult(null);
+                        setVndbLatency(null);
+                        setVndbTestError(null);
+                      }}
+                      placeholder="http://127.0.0.1:7890"
+                      className="w-full px-3 py-2 bg-surface-2 border border-surface-3 rounded-lg text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-2 mt-2">
+                      <button
+                        onClick={handleTestVndb}
+                        disabled={testingVndb}
+                        className="px-3 py-1.5 text-xs bg-surface-3 hover:bg-surface-4 disabled:opacity-40 text-text-secondary rounded-lg transition-colors"
+                      >
+                        {testingVndb ? <Loader2 className="w-3 h-3 animate-spin" /> : "测试 VNDB 连接"}
+                      </button>
+                      {vndbTestResult === "success" && vndbLatency !== null && (
+                        <span className={`text-[10px] flex items-center gap-1 ${vndbLatency < 500 ? "text-status-finished" : vndbLatency < 1500 ? "text-yellow-400" : "text-orange-400"}`}>
+                          <CheckCircle2 className="w-3 h-3" /> 连接成功 · {vndbLatency} ms
+                        </span>
+                      )}
+                      {vndbTestResult === "fail" && (
+                        <span className="text-[10px] text-status-shelved flex items-center gap-1 max-w-[200px] truncate" title={vndbTestError ?? ""}>
+                          <AlertCircle className="w-3 h-3 shrink-0" /> {vndbTestError ? vndbTestError.slice(0, 40) : "连接失败"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Info */}
                   <div className="p-3 bg-surface-2 rounded-lg text-[10px] text-text-muted space-y-1">
-                    <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（无需配置，自动使用系统代理）</p>
+                    <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（使用上方代理设置）</p>
                     <p>• DeepSeek：翻译简介 + 从标签库中匹配类型标签（需要 API Key，直连不走代理）</p>
                   </div>
                 </div>

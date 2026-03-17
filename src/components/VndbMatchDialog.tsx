@@ -134,8 +134,9 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
     setApplying(true);
 
     try {
-      const [apiKey, genreTags] = await Promise.all([
+      const [apiKey, proxyUrl, genreTags] = await Promise.all([
         database.getSetting("deepseek_api_key"),
+        database.getSetting("proxy_url"),
         database.getGenreTags(),
       ]);
 
@@ -151,7 +152,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
             return await invoke<string>("download_cover", {
               url: selectedCover.url,
               filename: `${selectedCover.id}.${ext}`,
-              proxyUrl: "",
+              proxyUrl,
             });
           } catch (err) {
             toast("error", `「${selectedVn.title}」封面下载失败: ${err}`);
@@ -165,7 +166,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
         const results = await Promise.allSettled(
           selectedVn.screenshots.slice(0, 6).map((ss) => {
             const ext = ss.url.split(".").pop() || "jpg";
-            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl: "" });
+            return invoke<string>("download_screenshot", { url: ss.url, filename: `${ss.id}.${ext}`, proxyUrl });
           })
         );
         return results
