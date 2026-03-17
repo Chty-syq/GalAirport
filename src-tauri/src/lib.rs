@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tauri::{Emitter, Manager};
@@ -13,6 +14,8 @@ use async_openai::{
     },
     Client as OpenAIClient,
 };
+
+const GITHUB_REPO: &str = "Chty-syq/GalAirport";
 
 // ─── 引擎识别 ────────────────────────────────────────────────
 
@@ -411,6 +414,148 @@ async fn deepseek_test(api_key: String) -> Result<bool, String> {
     Ok(client.chat().create(req).await.is_ok())
 }
 
+// ─── 更新检查 ────────────────────────────────────────────────
+
+#[derive(Serialize)]
+pub struct UpdateInfo {
+    pub has_update: bool,
+    pub latest_version: String,
+    pub current_version: String,
+    pub release_url: String,
+    pub download_url: String,
+}
+
+#[derive(Serialize, Clone)]
+pub struct DownloadProgress {
+    pub downloaded: u64,
+    pub total: u64,
+}
+
+/// 比较两个 semver 字符串，a > b 时返回 true（忽略前导 'v'）
+fn version_gt(a: &str, b: &str) -> bool {
+    let parse = |s: &str| -> Vec<u64> {
+        s.trim_start_matches('v')
+            .split('.')
+            .filter_map(|x| x.parse().ok())
+            .collect()
+    };
+    parse(a) > parse(b)
+}
+
+/// 检查 GitHub 是否有新版本，返回版本信息
+#[tauri::command]
+async fn check_update(
+    app_handle: tauri::AppHandle,
+    proxy_url: String,
+) -> Result<UpdateInfo, String> {
+    let current = app_handle.package_info().version.to_string();
+
+    let client = build_proxy_client(&proxy_url)?;
+    let resp = client
+        .get(format!("https://api.github.com/repos/{}/releases/latest", GITHUB_REPO))
+        .header("User-Agent", "GalManager")
+        .timeout(std::time::Duration::from_secs(10))
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status().as_u16()));
+    }
+
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("解析失败: {}", e))?;
+
+    let tag = json["tag_name"].as_str().ok_or("无法获取版本号")?.to_string();
+    let release_url = json["html_url"].as_str().unwrap_or("").to_string();
+    let has_update = version_gt(&tag, &current);
+
+    // 从 assets 中找 NSIS 安装包（优先 x64-setup.exe，其次任意 setup.exe）
+    let download_url = json["assets"]
+        .as_array()
+        .and_then(|assets| {
+            assets
+                .iter()
+                .find(|a| {
+                    a["name"]
+                        .as_str()
+                        .map(|n| n.ends_with("_x64-setup.exe"))
+                        .unwrap_or(false)
+                })
+                .or_else(|| {
+                    assets.iter().find(|a| {
+                        a["name"]
+                            .as_str()
+                            .map(|n| n.to_lowercase().contains("setup") && n.ends_with(".exe"))
+                            .unwrap_or(false)
+                    })
+                })
+                .and_then(|a| a["browser_download_url"].as_str())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_default();
+
+    Ok(UpdateInfo {
+        has_update,
+        latest_version: tag,
+        current_version: format!("v{}", current),
+        release_url,
+        download_url,
+    })
+}
+
+/// 流式下载更新安装包到临时目录，通过事件上报进度，返回本地文件路径
+#[tauri::command]
+async fn download_update(
+    app_handle: tauri::AppHandle,
+    url: String,
+    proxy_url: String,
+) -> Result<String, String> {
+    use std::io::Write;
+
+    let filename = url.split('/').last().unwrap_or("GalManager-setup.exe");
+    let dest = std::env::temp_dir().join(filename);
+
+    let client = build_proxy_client(&proxy_url)?;
+    let resp = client
+        .get(&url)
+        .header("User-Agent", "GalManager")
+        .timeout(std::time::Duration::from_secs(300))
+        .send()
+        .await
+        .map_err(|e| format!("下载请求失败: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status().as_u16()));
+    }
+
+    let total = resp.content_length().unwrap_or(0);
+    let mut downloaded: u64 = 0;
+    let mut file = std::fs::File::create(&dest)
+        .map_err(|e| format!("创建文件失败: {}", e))?;
+
+    let mut stream = resp.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| format!("读取数据失败: {}", e))?;
+        file.write_all(&chunk).map_err(|e| format!("写入失败: {}", e))?;
+        downloaded += chunk.len() as u64;
+        let _ = app_handle.emit("update_download_progress", DownloadProgress { downloaded, total });
+    }
+
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// 启动已下载的安装包（NSIS 安装程序），启动后应用可继续运行直到用户确认
+#[tauri::command]
+fn install_update(path: String) -> Result<(), String> {
+    std::process::Command::new(&path)
+        .spawn()
+        .map_err(|e| format!("启动安装程序失败: {}", e))?;
+    Ok(())
+}
+
 /// 测试 VNDB 连接（使用指定代理），返回延迟毫秒数
 #[tauri::command]
 async fn test_vndb_connection(proxy_url: String) -> Result<u64, String> {
@@ -496,6 +641,9 @@ pub fn run() {
             find_save_directories,
             download_cover,
             download_screenshot,
+            check_update,
+            download_update,
+            install_update,
             test_vndb_connection,
             deepseek_translate,
             deepseek_test,

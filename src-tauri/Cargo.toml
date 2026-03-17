@@ -1,6 +1,6 @@
 [package]
 name = "galgame-manager"
-version = "0.1.0"
+version = "1.1.0"
 description = "A local Galgame library manager"
 authors = ["you"]
 edition = "2021"
@@ -24,7 +24,8 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 walkdir = "2"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
-reqwest = { version = "0.12", features = ["rustls-tls", "socks"] }
+reqwest = { version = "0.12", features = ["rustls-tls", "socks", "stream"] }
+futures-util = "0.3"
 async-openai = "0.25"
 sysinfo = "0.33"
 

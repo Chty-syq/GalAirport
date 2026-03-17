@@ -1,15 +1,26 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw, Globe } from "lucide-react";
+import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw, Globe, Info, RefreshCw, ArrowUpCircle, Download } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import * as db from "@/lib/database";
 import { testApiKey } from "@/lib/deepseek";
 import { useTheme, THEME_LIST } from "@/hooks/useTheme";
+
+const GITHUB_REPO = "Chty-syq/GalAirport";
 
 interface Props {
   onClose: () => void;
 }
 
-type SettingsTab = "appearance" | "api" | "tags";
+type SettingsTab = "appearance" | "api" | "tags" | "about";
+
+interface UpdateInfo {
+  has_update: boolean;
+  latest_version: string;
+  current_version: string;
+  release_url: string;
+  download_url: string;
+}
 
 export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: SettingsTab }) {
   const { theme, setTheme } = useTheme();
@@ -24,6 +35,16 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const [vndbLatency, setVndbLatency] = useState<number | null>(null);
   const [vndbTestError, setVndbTestError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // About / update check
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+  // Download state
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<{ downloaded: number; total: number } | null>(null);
+  const [downloadedPath, setDownloadedPath] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   // Genre tag library state
   const [genreTags, setGenreTagsState] = useState<string[]>([]);
@@ -80,6 +101,50 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
     const ok = await testApiKey(deepseekKey);
     setTestResult(ok ? "success" : "fail");
     setTesting(false);
+  };
+
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo?.download_url) return;
+    setDownloading(true);
+    setDownloadProgress(null);
+    setDownloadedPath(null);
+    setDownloadError(null);
+
+    const unlisten = await listen<{ downloaded: number; total: number }>(
+      "update_download_progress",
+      (e) => setDownloadProgress(e.payload)
+    );
+
+    try {
+      const path = await invoke<string>("download_update", {
+        url: updateInfo.download_url,
+        proxyUrl: proxyUrl.trim(),
+      });
+      setDownloadedPath(path);
+    } catch (e) {
+      setDownloadError(String(e));
+    } finally {
+      unlisten();
+      setDownloading(false);
+    }
+  };
+
+  const handleInstallUpdate = () => {
+    if (!downloadedPath) return;
+    invoke("install_update", { path: downloadedPath });
+  };
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateInfo(null);
+    setUpdateError(null);
+    try {
+      const info = await invoke<UpdateInfo>("check_update", { proxyUrl: proxyUrl.trim() });
+      setUpdateInfo(info);
+    } catch (e) {
+      setUpdateError(String(e));
+    }
+    setCheckingUpdate(false);
   };
 
   const handleTestVndb = async () => {
@@ -159,6 +224,17 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
           >
             <Tag className="w-3 h-3 inline mr-1.5" />
             标签库
+          </button>
+          <button
+            onClick={() => setTab("about")}
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              tab === "about"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <Info className="w-3 h-3 inline mr-1.5" />
+            关于
           </button>
         </div>
 
@@ -427,6 +503,151 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                   </button>
                 </>
               )}
+            </div>
+          )}
+          {tab === "about" && (
+            <div className="space-y-5">
+              {/* App identity */}
+              <div className="flex flex-col items-center gap-2 py-4">
+                <div className="w-14 h-14 rounded-2xl bg-accent/15 flex items-center justify-center">
+                  <span className="text-2xl font-bold text-accent">G</span>
+                </div>
+                <p className="text-sm font-semibold text-text-primary">GalManager</p>
+                <p className="text-[10px] text-text-muted">本地 Galgame 库管理工具</p>
+              </div>
+
+              {/* Update check */}
+              <div className="p-4 bg-surface-2 rounded-xl border border-surface-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-secondary">检查更新</span>
+                  <button
+                    onClick={handleCheckUpdate}
+                    disabled={checkingUpdate}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-3 hover:bg-surface-4 disabled:opacity-40 text-text-secondary rounded-lg transition-colors"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${checkingUpdate ? "animate-spin" : ""}`} />
+                    {checkingUpdate ? "检查中…" : "检查更新"}
+                  </button>
+                </div>
+
+                {/* 检查结果 */}
+                {updateInfo && !updateInfo.has_update && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface-3 text-xs">
+                    <CheckCircle2 className="w-4 h-4 text-status-finished shrink-0" />
+                    <div>
+                      <p className="text-text-secondary">已是最新版本</p>
+                      <p className="text-text-muted mt-0.5">{updateInfo.current_version}</p>
+                    </div>
+                  </div>
+                )}
+
+                {updateInfo?.has_update && (
+                  <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20 space-y-2.5 text-xs">
+                    <div className="flex items-center gap-2">
+                      <ArrowUpCircle className="w-4 h-4 text-accent shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-text-primary font-medium">发现新版本 {updateInfo.latest_version}</p>
+                        <p className="text-text-muted">当前版本 {updateInfo.current_version}</p>
+                      </div>
+                    </div>
+
+                    {/* 下载进度条 */}
+                    {downloading && downloadProgress && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-text-muted">
+                          <span>下载中…</span>
+                          <span>
+                            {downloadProgress.total > 0
+                              ? `${Math.round((downloadProgress.downloaded / downloadProgress.total) * 100)}%`
+                              : `${(downloadProgress.downloaded / 1024 / 1024).toFixed(1)} MB`}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-accent rounded-full transition-all duration-200"
+                            style={{
+                              width: downloadProgress.total > 0
+                                ? `${(downloadProgress.downloaded / downloadProgress.total) * 100}%`
+                                : "100%",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {downloading && !downloadProgress && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
+                        <Loader2 className="w-3 h-3 animate-spin" /> 连接中…
+                      </div>
+                    )}
+
+                    {/* 下载错误 */}
+                    {downloadError && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-status-shelved">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        <span className="truncate" title={downloadError}>{downloadError}</span>
+                      </div>
+                    )}
+
+                    {/* 操作按钮 */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {!downloadedPath && (
+                        <button
+                          onClick={handleDownloadUpdate}
+                          disabled={downloading || !updateInfo.download_url}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover disabled:opacity-40 text-white rounded-lg transition-colors"
+                        >
+                          {downloading
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Download className="w-3 h-3" />}
+                          {downloading ? "下载中…" : "下载更新"}
+                        </button>
+                      )}
+                      {downloadedPath && (
+                        <button
+                          onClick={handleInstallUpdate}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors"
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          立即安装
+                        </button>
+                      )}
+                      {!updateInfo.download_url && (
+                        <button
+                          onClick={() => invoke("open_url", { url: updateInfo.release_url })}
+                          className="text-[10px] text-accent hover:underline"
+                        >
+                          前往下载页面 →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {updateError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface-3 text-xs">
+                    <AlertCircle className="w-4 h-4 text-status-shelved shrink-0" />
+                    <span className="text-text-muted truncate" title={updateError}>{updateError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Links */}
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={() => invoke("open_url", { url: `https://github.com/${GITHUB_REPO}` })}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-3 transition-colors text-xs text-text-secondary text-left"
+                >
+                  <Globe className="w-3.5 h-3.5 text-accent" />
+                  GitHub 仓库
+                </button>
+                <button
+                  onClick={() => invoke("open_url", { url: `https://github.com/${GITHUB_REPO}/releases` })}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-3 transition-colors text-xs text-text-secondary text-left"
+                >
+                  <ArrowUpCircle className="w-3.5 h-3.5 text-accent" />
+                  所有发布版本
+                </button>
+              </div>
             </div>
           )}
         </div>
