@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import type { Game, GameFormData, ViewMode } from "@/types/game";
 import { useGameLibrary } from "@/hooks/useGameLibrary";
+import { useAppearance, CARD_SIZE_OPTIONS, CARD_GAP_OPTIONS } from "@/hooks/useAppearance";
 import * as db from "@/lib/database";
 import { Sidebar } from "@/components/Sidebar";
 import { Toolbar } from "@/components/Toolbar";
@@ -21,6 +22,9 @@ import { WalkthroughDialog } from "@/components/WalkthroughDialog";
 
 function App() {
   const library = useGameLibrary();
+  const { appearance } = useAppearance();
+  const cardMinPx = CARD_SIZE_OPTIONS.find((o) => o.value === appearance.cardSize)?.px ?? 180;
+  const cardGapCls = CARD_GAP_OPTIONS.find((o) => o.value === appearance.cardGap)?.cls ?? "gap-4";
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showForm, setShowForm] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -249,7 +253,7 @@ function App() {
                 </p>
               </div>
             ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+              <div className={`grid grid-cols-[repeat(auto-fill,minmax(${cardMinPx}px,1fr))] ${cardGapCls}`}>
                 {library.games.map((game) => (
                   <GameCard
                     key={game.id}

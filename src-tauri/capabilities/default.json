@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "Default capabilities for GalManager",
+  "description": "Default capabilities for GalAirport",
   "windows": ["main"],
   "permissions": [
     "core:default",

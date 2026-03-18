@@ -4,157 +4,60 @@ import { X, Edit, Wand2, Loader2, Save, AlertCircle, GitBranch, ArrowLeft, GitCo
 import { invoke } from "@tauri-apps/api/core";
 import type { Game } from "@/types/game";
 import * as db from "@/lib/database";
-import { useTheme, type Theme } from "@/hooks/useTheme";
 
-// ─── Per-theme mermaid configuration ────────────────────────
-interface MermaidThemeCfg {
-  vars: Record<string, string>;
-  /** CSS injected into the rendered SVG for shape-based coloring */
-  svgCss: string;
-  /** Radial gradient for the preview background */
-  bg: string;
-}
+// ─── Unified flowchart style (theme-independent) ─────────────
+// Node semantics (Mermaid shape → SVG element):
+//   ([text])   stadium  → <path>    : steel blue — main narrative / story nodes
+//   [text]     rect     → <rect>    : deep rose  — player choices / branch nodes
+//   {{text}}   hexagon  → <polygon> : forest green, left-right pointed — decision nodes ◁▬▷
+//   ((text))   circle   → <circle>  : warm purple — route endings
+const FLOWCHART_BG = "linear-gradient(160deg, #f5f0fc 0%, #ede8f8 55%, #f8f4ff 100%)";
 
-const MERMAID_THEMES: Record<Theme, MermaidThemeCfg> = {
-  dark: {
-    vars: {
-      primaryColor: "#1e1240", primaryTextColor: "#ede9fe", primaryBorderColor: "#7c3aed",
-      secondaryColor: "#17102e", secondaryTextColor: "#c4b5fd", secondaryBorderColor: "#6d28d9",
-      tertiaryColor: "#0f0c1e", tertiaryTextColor: "#a78bfa", tertiaryBorderColor: "#5b21b6",
-      lineColor: "#8b5cf6", edgeLabelBackground: "#17102e",
-      background: "#0d0a1a", mainBkg: "#1e1240", nodeBorder: "#7c3aed",
-      clusterBkg: "#17102e", clusterBorder: "#5b21b6",
-      noteBkgColor: "#1e1240", noteTextColor: "#c4b5fd", noteBorderColor: "#7c3aed",
-      titleColor: "#ede9fe", textColor: "#ede9fe", fontSize: "24px",
-    },
-    svgCss: `
-      g.node > rect    { fill:#1e1240!important; stroke:#7c3aed!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(124,58,237,.35)); }
-      g.node > polygon { fill:#2a0f28!important; stroke:#ec4899!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(236,72,153,.35)); }
-      g.node > path    { fill:#0f1e3d!important; stroke:#60a5fa!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(96,165,250,.35)); }
-      g.node > circle  { fill:#0f2218!important; stroke:#34d399!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(52,211,153,.4)); }
-      .edgePath path.path { stroke:#8b5cf6!important; stroke-width:1.5px!important; }
-      .edgePath marker path { fill:#8b5cf6!important; }
-      .edgeLabel .label rect { fill:#17102e!important; stroke:#5b21b6!important; }
-      .edgeLabel .label span { color:#c4b5fd!important; }
-      g.node .label { color:#ede9fe!important; }`,
-    bg: "radial-gradient(ellipse at 50% 0%, #1a1033 0%, #0d0a1a 70%)",
-  },
-  midnight: {
-    vars: {
-      primaryColor: "#0a1832", primaryTextColor: "#d6e2f8", primaryBorderColor: "#38b2f8",
-      secondaryColor: "#0c1e3e", secondaryTextColor: "#93c5fd", secondaryBorderColor: "#2563eb",
-      tertiaryColor: "#060e24", tertiaryTextColor: "#7eb2ff", tertiaryBorderColor: "#1e40af",
-      lineColor: "#38b2f8", edgeLabelBackground: "#0c1e3e",
-      background: "#090c19", mainBkg: "#0a1832", nodeBorder: "#38b2f8",
-      clusterBkg: "#0c1e3e", clusterBorder: "#1e40af",
-      noteBkgColor: "#0a1832", noteTextColor: "#93c5fd", noteBorderColor: "#38b2f8",
-      titleColor: "#d6e2f8", textColor: "#d6e2f8", fontSize: "24px",
-    },
-    svgCss: `
-      g.node > rect    { fill:#0a1832!important; stroke:#38b2f8!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(56,178,248,.35)); }
-      g.node > polygon { fill:#101040!important; stroke:#818cf8!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(129,140,248,.35)); }
-      g.node > path    { fill:#03102a!important; stroke:#67e8f9!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(103,232,249,.35)); }
-      g.node > circle  { fill:#06201a!important; stroke:#34d399!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(52,211,153,.4)); }
-      .edgePath path.path { stroke:#38b2f8!important; stroke-width:1.5px!important; }
-      .edgePath marker path { fill:#38b2f8!important; }
-      .edgeLabel .label rect { fill:#0c1e3e!important; stroke:#1e40af!important; }
-      .edgeLabel .label span { color:#93c5fd!important; }
-      g.node .label { color:#d6e2f8!important; }`,
-    bg: "radial-gradient(ellipse at 50% 0%, #0f1e42 0%, #090c19 70%)",
-  },
-  forest: {
-    vars: {
-      primaryColor: "#0d2012", primaryTextColor: "#d2eed6", primaryBorderColor: "#34ca66",
-      secondaryColor: "#101e0c", secondaryTextColor: "#86efac", secondaryBorderColor: "#15803d",
-      tertiaryColor: "#061408", tertiaryTextColor: "#4ade80", tertiaryBorderColor: "#166534",
-      lineColor: "#34ca66", edgeLabelBackground: "#101e0c",
-      background: "#09100b", mainBkg: "#0d2012", nodeBorder: "#34ca66",
-      clusterBkg: "#101e0c", clusterBorder: "#166534",
-      noteBkgColor: "#0d2012", noteTextColor: "#86efac", noteBorderColor: "#34ca66",
-      titleColor: "#d2eed6", textColor: "#d2eed6", fontSize: "24px",
-    },
-    svgCss: `
-      g.node > rect    { fill:#0d2012!important; stroke:#34ca66!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(52,202,102,.35)); }
-      g.node > polygon { fill:#1c2a0c!important; stroke:#a3e635!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(163,230,53,.35)); }
-      g.node > path    { fill:#062018!important; stroke:#5eead4!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(94,234,212,.35)); }
-      g.node > circle  { fill:#152015!important; stroke:#86efac!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 6px rgba(134,239,172,.4)); }
-      .edgePath path.path { stroke:#34ca66!important; stroke-width:1.5px!important; }
-      .edgePath marker path { fill:#34ca66!important; }
-      .edgeLabel .label rect { fill:#101e0c!important; stroke:#166534!important; }
-      .edgeLabel .label span { color:#86efac!important; }
-      g.node .label { color:#d2eed6!important; }`,
-    bg: "radial-gradient(ellipse at 50% 0%, #0d2a12 0%, #09100b 70%)",
-  },
-  light: {
-    vars: {
-      primaryColor: "#ede9fe", primaryTextColor: "#3b1fa8", primaryBorderColor: "#7c3aed",
-      secondaryColor: "#f5f3ff", secondaryTextColor: "#5b21b6", secondaryBorderColor: "#a78bfa",
-      tertiaryColor: "#faf9ff", tertiaryTextColor: "#7c3aed", tertiaryBorderColor: "#c4b5fd",
-      lineColor: "#7c3aed", edgeLabelBackground: "#f5f3ff",
-      background: "#eeedf9", mainBkg: "#ede9fe", nodeBorder: "#7c3aed",
-      clusterBkg: "#f5f3ff", clusterBorder: "#a78bfa",
-      noteBkgColor: "#ede9fe", noteTextColor: "#5b21b6", noteBorderColor: "#7c3aed",
-      titleColor: "#18163a", textColor: "#18163a", fontSize: "24px",
-    },
-    svgCss: `
-      g.node > rect    { fill:#ede9fe!important; stroke:#7c3aed!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(124,58,237,.18)); }
-      g.node > polygon { fill:#fce7f3!important; stroke:#db2777!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(219,39,119,.18)); }
-      g.node > path    { fill:#dbeafe!important; stroke:#2563eb!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(37,99,235,.18)); }
-      g.node > circle  { fill:#dcfce7!important; stroke:#16a34a!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(22,163,74,.22)); }
-      .edgePath path.path { stroke:#7c3aed!important; stroke-width:1.5px!important; }
-      .edgePath marker path { fill:#7c3aed!important; }
-      .edgeLabel .label rect { fill:#f5f3ff!important; stroke:#a78bfa!important; }
-      .edgeLabel .label span { color:#5b21b6!important; }
-      g.node .label { color:#18163a!important; }`,
-    bg: "radial-gradient(ellipse at 50% 0%, #e8e4f8 0%, #f4f2fd 70%)",
-  },
-  sakura: {
-    vars: {
-      primaryColor: "#fce7f3", primaryTextColor: "#6b0e32", primaryBorderColor: "#d02658",
-      secondaryColor: "#fdf2f8", secondaryTextColor: "#9d1754", secondaryBorderColor: "#ec4899",
-      tertiaryColor: "#fef9fb", tertiaryTextColor: "#be185d", tertiaryBorderColor: "#f9a8d4",
-      lineColor: "#d02658", edgeLabelBackground: "#fdf2f8",
-      background: "#fbf4f8", mainBkg: "#fce7f3", nodeBorder: "#d02658",
-      clusterBkg: "#fdf2f8", clusterBorder: "#f9a8d4",
-      noteBkgColor: "#fce7f3", noteTextColor: "#9d1754", noteBorderColor: "#d02658",
-      titleColor: "#2a0c1e", textColor: "#2a0c1e", fontSize: "24px",
-    },
-    svgCss: `
-      g.node > rect    { fill:#fce7f3!important; stroke:#d02658!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(208,38,88,.18)); }
-      g.node > polygon { fill:#f5e6ff!important; stroke:#9333ea!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(147,51,234,.18)); }
-      g.node > path    { fill:#eff6ff!important; stroke:#3b82f6!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(59,130,246,.18)); }
-      g.node > circle  { fill:#fff7ed!important; stroke:#ea580c!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(234,88,12,.22)); }
-      .edgePath path.path { stroke:#d02658!important; stroke-width:1.5px!important; }
-      .edgePath marker path { fill:#d02658!important; }
-      .edgeLabel .label rect { fill:#fdf2f8!important; stroke:#f9a8d4!important; }
-      .edgeLabel .label span { color:#9d1754!important; }
-      g.node .label { color:#2a0c1e!important; }`,
-    bg: "radial-gradient(ellipse at 50% 0%, #fce7f3 0%, #fdf4f8 70%)",
-  },
-  mocha: {
-    vars: {
-      primaryColor: "#fef3c7", primaryTextColor: "#4a2008", primaryBorderColor: "#b25213",
-      secondaryColor: "#fde8d0", secondaryTextColor: "#7c3b0a", secondaryBorderColor: "#c2410c",
-      tertiaryColor: "#fef9f0", tertiaryTextColor: "#92400e", tertiaryBorderColor: "#d97706",
-      lineColor: "#b25213", edgeLabelBackground: "#fde8d0",
-      background: "#f7efe3", mainBkg: "#fef3c7", nodeBorder: "#b25213",
-      clusterBkg: "#fde8d0", clusterBorder: "#d97706",
-      noteBkgColor: "#fef3c7", noteTextColor: "#7c3b0a", noteBorderColor: "#b25213",
-      titleColor: "#34200c", textColor: "#34200c", fontSize: "24px",
-    },
-    svgCss: `
-      g.node > rect    { fill:#fef3c7!important; stroke:#b25213!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(178,82,19,.18)); }
-      g.node > polygon { fill:#fde8d0!important; stroke:#c2410c!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(194,65,12,.18)); }
-      g.node > path    { fill:#e0f2fe!important; stroke:#0284c7!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(2,132,199,.18)); }
-      g.node > circle  { fill:#dcfce7!important; stroke:#15803d!important; stroke-width:1.5px!important; filter:drop-shadow(0 0 4px rgba(21,128,61,.22)); }
-      .edgePath path.path { stroke:#b25213!important; stroke-width:1.5px!important; }
-      .edgePath marker path { fill:#b25213!important; }
-      .edgeLabel .label rect { fill:#fde8d0!important; stroke:#d97706!important; }
-      .edgeLabel .label span { color:#7c3b0a!important; }
-      g.node .label { color:#34200c!important; }`,
-    bg: "radial-gradient(ellipse at 50% 0%, #f5e8d0 0%, #f9f2e6 70%)",
-  },
+const FLOWCHART_VARS: Record<string, string> = {
+  primaryColor: "#2e6a98",
+  primaryTextColor: "#ffffff",
+  primaryBorderColor: "#4d90c8",
+  secondaryColor: "#c8304a",
+  secondaryTextColor: "#ffffff",
+  secondaryBorderColor: "#e85570",
+  tertiaryColor: "#257a50",
+  tertiaryTextColor: "#ffffff",
+  tertiaryBorderColor: "#3aaa72",
+  lineColor: "#1a1a1a",
+  edgeLabelBackground: "#ede8f8",
+  background: "#f5f0fc",
+  mainBkg: "#2e6a98",
+  nodeBorder: "#4d90c8",
+  clusterBkg: "#ede8f8",
+  clusterBorder: "#c8b8e0",
+  noteBkgColor: "#ede8f8",
+  noteTextColor: "#5a3a7a",
+  noteBorderColor: "#c8b8e0",
+  titleColor: "#2a1a4a",
+  textColor: "#2a1a4a",
+  fontSize: "24px",
 };
+
+const FLOWCHART_SVG_CSS = `
+  /* Stadium ([text]) — steel blue, main narrative */
+  g.node > path    { fill:#2e6a98!important; stroke:#4d90c8!important; stroke-width:2px!important; filter:drop-shadow(0 3px 8px rgba(46,106,152,.22)); }
+  /* Rect [text] — cherry pink, player choices */
+  g.node > rect    { fill:#cc3a62!important; stroke:#e8608a!important; stroke-width:2px!important; rx:8px!important; ry:8px!important; filter:drop-shadow(0 3px 8px rgba(204,58,98,.24)); }
+  /* Hexagon {{text}} — forest green, decision nodes with pointed left/right ends */
+  g.node > polygon { fill:#257a50!important; stroke:#3aaa72!important; stroke-width:2px!important; filter:drop-shadow(0 3px 8px rgba(37,122,80,.22)); }
+  /* Circle ((text)) — warm purple, route endings */
+  g.node > circle  { fill:#6a3898!important; stroke:#9060c8!important; stroke-width:2px!important; filter:drop-shadow(0 3px 8px rgba(106,56,152,.22)); }
+  /* All node labels: white text */
+  g.node text, g.node .label { fill:#ffffff!important; color:#ffffff!important; }
+  /* Arrows: black, bold — multiple selectors for Mermaid v10/v11 compatibility */
+  .edgePath path, .edgePath path.path,
+  path.flowchart-link, .edge path,
+  g.edgePaths path, g.edges path { stroke:#1a1a1a!important; stroke-width:6px!important; stroke-linecap:round!important; stroke-linejoin:round!important; }
+  .edgePath marker path, marker path { fill:#1a1a1a!important; stroke:#1a1a1a!important; }
+  /* Edge label */
+  .edgeLabel .label rect { fill:#ede8f8!important; stroke:#c8b8e0!important; }
+  .edgeLabel .label span, .edgeLabel .label p { color:#5a3a7a!important; }
+`;
 
 mermaid.initialize({ startOnLoad: false, theme: "base", fontFamily: "system-ui, -apple-system, sans-serif", flowchart: { curve: "basis", padding: 20, diagramPadding: 24 } });
 
@@ -171,7 +74,6 @@ interface Props {
 }
 
 export function WalkthroughDialog({ game, onClose }: Props) {
-  const { theme } = useTheme();
   const [mode, setMode] = useState<Mode>("view");
   const [leftPanel, setLeftPanel] = useState<LeftPanel>("code");
   const [code, setCode] = useState("");
@@ -208,20 +110,32 @@ export function WalkthroughDialog({ game, onClose }: Props) {
       return () => { cancelled = true; };
     }
     const id = ++renderIdRef.current;
-    const cfg = MERMAID_THEMES[theme];
     const timer = setTimeout(async () => {
       if (cancelled || !container) return;
       mermaid.initialize({
         startOnLoad: false,
         theme: "base",
-        themeVariables: cfg.vars,
+        themeVariables: FLOWCHART_VARS,
         fontFamily: "system-ui, -apple-system, sans-serif",
         flowchart: { curve: "basis", padding: 20, diagramPadding: 24 },
       });
       try {
         const { svg } = await mermaid.render(`mm-${id}`, code);
         if (!cancelled && previewRef.current === container) {
-          container.innerHTML = enhanceSvg(svg, cfg.svgCss);
+          // Enlarge arrowhead markers directly in the SVG string before DOM parsing
+          const processedSvg = svg
+            .replace(/markerWidth="[^"]*"/g, 'markerWidth="16"')
+            .replace(/markerHeight="[^"]*"/g, 'markerHeight="16"')
+            .replace(/(<marker[^>]*>[\s\S]*?<path[^>]*)\bfill="[^"]*"/g, '$1fill="#1a1a1a"');
+          container.innerHTML = enhanceSvg(processedSvg, FLOWCHART_SVG_CSS);
+          // Force edge stroke-width via DOM (overrides Mermaid inline styles)
+          container.querySelectorAll<SVGPathElement>(
+            ".edgePath path, path.flowchart-link, g.edges path, g.edgePaths path"
+          ).forEach((p) => {
+            p.style.setProperty("stroke", "#1a1a1a", "important");
+            p.style.setProperty("stroke-width", "6px", "important");
+            p.style.setProperty("stroke-linecap", "round", "important");
+          });
           setRenderError(null);
         }
       } catch (e: unknown) {
@@ -236,7 +150,7 @@ export function WalkthroughDialog({ game, onClose }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [code, mode, theme]);
+  }, [code, mode]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -314,7 +228,7 @@ export function WalkthroughDialog({ game, onClose }: Props) {
               </button>
             </div>
           </div>
-          <div className="flex-1 overflow-auto p-6 min-h-0" style={{ background: MERMAID_THEMES[theme].bg }}>
+          <div className="flex-1 overflow-auto p-6 min-h-0" style={{ background: FLOWCHART_BG }}>
             {!code.trim() ? (
               <div className="flex flex-col items-center justify-center h-48 gap-3 text-text-muted">
                 <GitCommitHorizontal className="w-10 h-10 opacity-20" />
@@ -462,7 +376,7 @@ export function WalkthroughDialog({ game, onClose }: Props) {
           </div>
 
           {/* Right: preview */}
-          <div className="flex-1 overflow-auto p-6 min-w-0" style={{ background: MERMAID_THEMES[theme].bg }}>
+          <div className="flex-1 overflow-auto p-6 min-w-0" style={{ background: FLOWCHART_BG }}>
             {!code.trim() ? (
               <div className="flex flex-col items-center justify-center h-full gap-2 text-text-muted">
                 <GitCommitHorizontal className="w-8 h-8 opacity-20" />

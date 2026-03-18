@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import * as db from "@/lib/database";
 import { testApiKey } from "@/lib/deepseek";
 import { useTheme, THEME_LIST } from "@/hooks/useTheme";
+import { useAppearance, CARD_SIZE_OPTIONS, CARD_GAP_OPTIONS } from "@/hooks/useAppearance";
 
 const GITHUB_REPO = "Chty-syq/GalAirport";
 
@@ -24,6 +25,7 @@ interface UpdateInfo {
 
 export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: SettingsTab }) {
   const { theme, setTheme } = useTheme();
+  const { appearance, setAppearance } = useAppearance();
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
   const [deepseekKey, setDeepseekKey] = useState("");
   const [proxyUrl, setProxyUrl] = useState("");
@@ -212,7 +214,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
             }`}
           >
             <Key className="w-3 h-3 inline mr-1.5" />
-            API 配置
+            配置
           </button>
           <button
             onClick={() => setTab("tags")}
@@ -223,7 +225,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
             }`}
           >
             <Tag className="w-3 h-3 inline mr-1.5" />
-            标签库
+            标签
           </button>
           <button
             onClick={() => setTab("about")}
@@ -325,6 +327,49 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Card size */}
+              <div className="border-t border-surface-3 pt-4">
+                <p className="text-xs font-medium text-text-secondary mb-1">卡片大小</p>
+                <p className="text-[10px] text-text-muted mb-3">调整游戏卡片在网格视图中的宽度。</p>
+                <div className="flex gap-2">
+                  {CARD_SIZE_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setAppearance({ cardSize: opt.value })}
+                      className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        appearance.cardSize === opt.value
+                          ? "border-accent bg-accent/10 text-accent"
+                          : "border-surface-3 text-text-muted hover:border-surface-4 hover:text-text-secondary"
+                      }`}
+                    >
+                      {opt.label}
+                      <span className="block text-[9px] font-normal opacity-60 mt-0.5">{opt.px}px</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Card gap */}
+              <div className="border-t border-surface-3 pt-4">
+                <p className="text-xs font-medium text-text-secondary mb-1">卡片间距</p>
+                <p className="text-[10px] text-text-muted mb-3">调整网格视图中卡片之间的间隔。</p>
+                <div className="flex gap-2">
+                  {CARD_GAP_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setAppearance({ cardGap: opt.value })}
+                      className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        appearance.cardGap === opt.value
+                          ? "border-accent bg-accent/10 text-accent"
+                          : "border-surface-3 text-text-muted hover:border-surface-4 hover:text-text-secondary"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
@@ -506,54 +551,134 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
             </div>
           )}
           {tab === "about" && (
-            <div className="space-y-5">
-              {/* App identity */}
-              <div className="flex flex-col items-center gap-2 py-4">
-                <div className="w-14 h-14 rounded-2xl bg-accent/15 flex items-center justify-center">
-                  <span className="text-2xl font-bold text-accent">G</span>
+            <div className="space-y-4">
+              {/* Hero banner */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-accent/20 via-accent/10 to-transparent border border-accent/20 px-5 py-6">
+                {/* Decorative circles */}
+                <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-accent/10 blur-xl pointer-events-none" />
+                <div className="absolute -bottom-4 -left-4 w-20 h-20 rounded-full bg-accent/8 blur-lg pointer-events-none" />
+
+                <div className="relative flex items-center gap-4">
+                  {/* Icon */}
+                  <div className="shrink-0 w-16 h-16 rounded-2xl shadow-lg overflow-hidden bg-gradient-to-br from-[#3b1f6e] to-[#6b3fa0] flex items-center justify-center border border-white/10">
+                    <svg viewBox="0 0 256 256" width="56" height="56" xmlns="http://www.w3.org/2000/svg">
+                      <defs>
+                        <linearGradient id="abt-hair" x1="0" y1="0" x2="1" y2="1">
+                          <stop offset="0%" stopColor="#ff8ecb"/>
+                          <stop offset="100%" stopColor="#c45aff"/>
+                        </linearGradient>
+                        <linearGradient id="abt-sky" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#1a0a2e"/>
+                          <stop offset="100%" stopColor="#6b3fa0"/>
+                        </linearGradient>
+                      </defs>
+                      <rect width="256" height="256" fill="url(#abt-sky)"/>
+                      {/* Stars */}
+                      <circle cx="30" cy="30" r="2" fill="white" opacity="0.8"/>
+                      <circle cx="60" cy="18" r="1.5" fill="white" opacity="0.7"/>
+                      <circle cx="200" cy="22" r="2" fill="#ffe4f7" opacity="0.9"/>
+                      <circle cx="230" cy="40" r="1.5" fill="white" opacity="0.7"/>
+                      {/* Moon */}
+                      <circle cx="215" cy="42" r="16" fill="#f0d8ff" opacity="0.9"/>
+                      <circle cx="222" cy="35" r="12" fill="#3b1f6e"/>
+                      {/* Plane */}
+                      <g transform="translate(158,68) rotate(-22)">
+                        <ellipse cx="0" cy="0" rx="26" ry="6" fill="white" opacity="0.95"/>
+                        <polygon points="-22,-6 -18,-16 -13,-6" fill="white" opacity="0.9"/>
+                        <polygon points="-4,-6 9,-6 16,12 0,9" fill="white" opacity="0.9"/>
+                        <polygon points="-4,6 9,6 16,-12 0,-9" fill="white" opacity="0.9"/>
+                      </g>
+                      {/* Runway */}
+                      <rect x="0" y="224" width="256" height="32" fill="#12043a" opacity="0.9"/>
+                      <rect x="50" y="230" width="18" height="3" rx="1.5" fill="#c4b5fd" opacity="0.7"/>
+                      <rect x="82" y="230" width="18" height="3" rx="1.5" fill="#c4b5fd" opacity="0.7"/>
+                      <rect x="114" y="230" width="18" height="3" rx="1.5" fill="#c4b5fd" opacity="0.7"/>
+                      <rect x="146" y="230" width="18" height="3" rx="1.5" fill="#c4b5fd" opacity="0.7"/>
+                      {/* Girl silhouette */}
+                      <ellipse cx="100" cy="116" rx="18" ry="20" fill="#ffe0c8"/>
+                      <path d="M 84,104 Q 82,88 90,80 Q 98,74 106,74 Q 116,74 122,82 Q 128,90 124,104 Q 118,93 110,91 Q 100,89 92,92 Q 86,96 84,104 Z" fill="url(#abt-hair)"/>
+                      <path d="M 84,104 Q 74,118 72,148 Q 76,168 82,172 Q 84,154 88,130 Z" fill="url(#abt-hair)" opacity="0.9"/>
+                      <path d="M 116,104 Q 126,118 128,148 Q 124,168 118,172 Q 116,154 112,130 Z" fill="url(#abt-hair)" opacity="0.9"/>
+                      <path d="M 86,138 Q 82,158 84,172 L 116,172 Q 118,158 114,138 Q 106,133 100,132 Q 94,133 86,138 Z" fill="#4a9fd4"/>
+                      <path d="M 84,172 Q 84,196 90,198 Q 100,201 110,198 Q 116,196 116,172 Z" fill="#3a8fd4"/>
+                      <ellipse cx="100" cy="98" rx="20" ry="4.5" fill="#2d5a9e"/>
+                      <rect x="86" y="88" width="28" height="11" rx="3" fill="#3a6fd4"/>
+                      <rect x="82" y="96" width="36" height="3.5" rx="1.5" fill="#2d5a9e"/>
+                      <polygon points="100,90 101.2,93 105,93 102,95 103,98 100,96 97,98 98,95 95,93 98.8,93" fill="#ffe066" opacity="0.95"/>
+                      <ellipse cx="92" cy="116" rx="4.5" ry="5" fill="#1a0060"/>
+                      <ellipse cx="92" cy="116" rx="3" ry="3.5" fill="#7b2fff"/>
+                      <circle cx="90.5" cy="114" r="1.3" fill="white" opacity="0.9"/>
+                      <ellipse cx="108" cy="116" rx="4.5" ry="5" fill="#1a0060"/>
+                      <ellipse cx="108" cy="116" rx="3" ry="3.5" fill="#7b2fff"/>
+                      <circle cx="106.5" cy="114" r="1.3" fill="white" opacity="0.9"/>
+                      <path d="M 97,127 Q 100,130 103,127" stroke="#e8607a" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+
+                  {/* App info */}
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base font-bold text-text-primary tracking-wide">GalAirport</h2>
+                    <p className="text-[11px] text-text-secondary mt-0.5">本地 Galgame 库管理工具</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      {updateInfo && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-accent/20 text-accent text-[10px] font-medium border border-accent/30">
+                          v{updateInfo.current_version}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-3 text-text-muted text-[10px]">
+                        Tauri · React
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm font-semibold text-text-primary">GalManager</p>
-                <p className="text-[10px] text-text-muted">本地 Galgame 库管理工具</p>
               </div>
 
               {/* Update check */}
-              <div className="p-4 bg-surface-2 rounded-xl border border-surface-3 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-text-secondary">检查更新</span>
+              <div className="rounded-xl border border-surface-3 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 bg-surface-2">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="w-3.5 h-3.5 text-accent" />
+                    <span className="text-xs font-medium text-text-secondary">版本更新</span>
+                  </div>
                   <button
                     onClick={handleCheckUpdate}
                     disabled={checkingUpdate}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-3 hover:bg-surface-4 disabled:opacity-40 text-text-secondary rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] bg-surface-3 hover:bg-surface-4 disabled:opacity-40 text-text-secondary rounded-lg transition-colors"
                   >
                     <RefreshCw className={`w-3 h-3 ${checkingUpdate ? "animate-spin" : ""}`} />
                     {checkingUpdate ? "检查中…" : "检查更新"}
                   </button>
                 </div>
 
-                {/* 检查结果 */}
+                {/* 已是最新 */}
                 {updateInfo && !updateInfo.has_update && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface-3 text-xs">
-                    <CheckCircle2 className="w-4 h-4 text-status-finished shrink-0" />
+                  <div className="flex items-center gap-3 px-4 py-3 bg-surface-1 border-t border-surface-3">
+                    <div className="w-7 h-7 rounded-full bg-status-finished/15 flex items-center justify-center shrink-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-status-finished" />
+                    </div>
                     <div>
-                      <p className="text-text-secondary">已是最新版本</p>
-                      <p className="text-text-muted mt-0.5">{updateInfo.current_version}</p>
+                      <p className="text-xs text-text-secondary font-medium">已是最新版本</p>
+                      <p className="text-[10px] text-text-muted mt-0.5">{updateInfo.current_version}</p>
                     </div>
                   </div>
                 )}
 
+                {/* 有新版本 */}
                 {updateInfo?.has_update && (
-                  <div className="p-2.5 rounded-lg bg-accent/10 border border-accent/20 space-y-2.5 text-xs">
-                    <div className="flex items-center gap-2">
-                      <ArrowUpCircle className="w-4 h-4 text-accent shrink-0" />
+                  <div className="px-4 py-3 space-y-3 bg-surface-1 border-t border-accent/20">
+                    <div className="flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-full bg-accent/15 flex items-center justify-center shrink-0">
+                        <ArrowUpCircle className="w-3.5 h-3.5 text-accent" />
+                      </div>
                       <div className="flex-1">
-                        <p className="text-text-primary font-medium">发现新版本 {updateInfo.latest_version}</p>
-                        <p className="text-text-muted">当前版本 {updateInfo.current_version}</p>
+                        <p className="text-xs text-text-primary font-medium">发现新版本 <span className="text-accent">{updateInfo.latest_version}</span></p>
+                        <p className="text-[10px] text-text-muted mt-0.5">当前 {updateInfo.current_version}</p>
                       </div>
                     </div>
 
                     {/* 下载进度条 */}
                     {downloading && downloadProgress && (
-                      <div className="space-y-1">
+                      <div className="space-y-1.5">
                         <div className="flex justify-between text-[10px] text-text-muted">
                           <span>下载中…</span>
                           <span>
@@ -564,7 +689,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                         </div>
                         <div className="w-full h-1.5 bg-surface-3 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-accent rounded-full transition-all duration-200"
+                            className="h-full bg-gradient-to-r from-accent to-accent-hover rounded-full transition-all duration-200"
                             style={{
                               width: downloadProgress.total > 0
                                 ? `${(downloadProgress.downloaded / downloadProgress.total) * 100}%`
@@ -594,7 +719,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                         <button
                           onClick={handleDownloadUpdate}
                           disabled={downloading || !updateInfo.download_url}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover disabled:opacity-40 text-white rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent hover:bg-accent-hover disabled:opacity-40 text-white rounded-lg transition-colors shadow-sm"
                         >
                           {downloading
                             ? <Loader2 className="w-3 h-3 animate-spin" />
@@ -605,7 +730,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                       {downloadedPath && (
                         <button
                           onClick={handleInstallUpdate}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors shadow-sm"
                         >
                           <CheckCircle2 className="w-3 h-3" />
                           立即安装
@@ -624,7 +749,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                 )}
 
                 {updateError && (
-                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-surface-3 text-xs">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-surface-1 border-t border-surface-3 text-xs">
                     <AlertCircle className="w-4 h-4 text-status-shelved shrink-0" />
                     <span className="text-text-muted truncate" title={updateError}>{updateError}</span>
                   </div>
@@ -632,22 +757,40 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
               </div>
 
               {/* Links */}
-              <div className="flex flex-col gap-1.5">
+              <div className="rounded-xl border border-surface-3 overflow-hidden">
                 <button
                   onClick={() => invoke("open_url", { url: `https://github.com/${GITHUB_REPO}` })}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-3 transition-colors text-xs text-text-secondary text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors text-left group"
                 >
-                  <Globe className="w-3.5 h-3.5 text-accent" />
-                  GitHub 仓库
+                  <div className="w-7 h-7 rounded-lg bg-surface-3 group-hover:bg-surface-4 flex items-center justify-center shrink-0 transition-colors">
+                    <Globe className="w-3.5 h-3.5 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-text-secondary font-medium">GitHub 仓库</p>
+                    <p className="text-[10px] text-text-muted truncate">github.com/{GITHUB_REPO}</p>
+                  </div>
+                  <ArrowUpCircle className="w-3 h-3 text-text-muted rotate-45 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
+                <div className="h-px bg-surface-3" />
                 <button
                   onClick={() => invoke("open_url", { url: `https://github.com/${GITHUB_REPO}/releases` })}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-3 transition-colors text-xs text-text-secondary text-left"
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-surface-2 hover:bg-surface-3 transition-colors text-left group"
                 >
-                  <ArrowUpCircle className="w-3.5 h-3.5 text-accent" />
-                  所有发布版本
+                  <div className="w-7 h-7 rounded-lg bg-surface-3 group-hover:bg-surface-4 flex items-center justify-center shrink-0 transition-colors">
+                    <ArrowUpCircle className="w-3.5 h-3.5 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-text-secondary font-medium">发布历史</p>
+                    <p className="text-[10px] text-text-muted">查看所有发布版本</p>
+                  </div>
+                  <ArrowUpCircle className="w-3 h-3 text-text-muted rotate-45 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </button>
               </div>
+
+              {/* Footer */}
+              <p className="text-center text-[10px] text-text-muted pb-1">
+                Made with ♥ · MIT License
+              </p>
             </div>
           )}
         </div>

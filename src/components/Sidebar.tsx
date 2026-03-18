@@ -1,6 +1,8 @@
-import { Gamepad2, Tag, X, Settings, FolderOpen, HelpCircle, Layers } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Tag, X, Settings, FolderOpen, HelpCircle, Layers, Upload } from "lucide-react";
 import type { Collection, PlayStatus } from "@/types/game";
 import { cn } from "@/lib/utils";
+import * as db from "@/lib/database";
 
 interface TagInfo {
   tag: string;
@@ -47,6 +49,28 @@ export function Sidebar({
   onSettings,
   onHelp,
 }: Props) {
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    db.getSetting("sidebar_avatar").then((val) => { if (val) setAvatar(val); });
+  }, []);
+
+  const handleAvatarClick = () => fileInputRef.current?.click();
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setAvatar(dataUrl);
+      db.setSetting("sidebar_avatar", dataUrl);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const toggleTag = (tag: string) => {
     if (filterTags.includes(tag)) {
       onFilterTagsChange(filterTags.filter((t) => t !== tag));
@@ -62,13 +86,33 @@ export function Sidebar({
     <aside className="w-56 flex-shrink-0 bg-surface-1 border-r border-surface-3/50 flex flex-col h-full overflow-hidden">
       {/* Brand */}
       <div className="px-5 pt-5 pb-4" data-tauri-drag-region>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleAvatarChange}
+        />
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center">
-            <Gamepad2 className="w-5 h-5 text-accent" />
-          </div>
+          {/* Avatar */}
+          <button
+            onClick={handleAvatarClick}
+            className="relative group w-12 h-12 rounded-2xl flex-shrink-0 overflow-hidden bg-accent/15 flex items-center justify-center focus:outline-none"
+            title="点击更换头像"
+          >
+            {avatar ? (
+              <img src={avatar} alt="avatar" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-xl font-bold text-accent select-none">G</span>
+            )}
+            {/* Hover overlay */}
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Upload className="w-4 h-4 text-white" />
+            </div>
+          </button>
           <div>
             <h1 className="text-sm font-bold text-text-primary tracking-wide">
-              GalManager
+              GalAirport
             </h1>
             <p className="text-[10px] text-text-muted">
               {gameCount} 个游戏

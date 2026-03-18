@@ -453,7 +453,7 @@ async fn check_update(
     let client = build_proxy_client(&proxy_url)?;
     let resp = client
         .get(format!("https://api.github.com/repos/{}/releases/latest", GITHUB_REPO))
-        .header("User-Agent", "GalManager")
+        .header("User-Agent", "GalAirport")
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await
@@ -515,13 +515,13 @@ async fn download_update(
 ) -> Result<String, String> {
     use std::io::Write;
 
-    let filename = url.split('/').last().unwrap_or("GalManager-setup.exe");
+    let filename = url.split('/').last().unwrap_or("GalAirport-setup.exe");
     let dest = std::env::temp_dir().join(filename);
 
     let client = build_proxy_client(&proxy_url)?;
     let resp = client
         .get(&url)
-        .header("User-Agent", "GalManager")
+        .header("User-Agent", "GalAirport")
         .timeout(std::time::Duration::from_secs(300))
         .send()
         .await

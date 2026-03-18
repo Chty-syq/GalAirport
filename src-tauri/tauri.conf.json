@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
-  "productName": "GalManager",
+  "productName": "GalAirport",
   "version": "1.1.1",
   "identifier": "com.galmanager.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "GalManager",
+        "title": "GalAirport",
         "width": 1280,
         "height": 800,
         "minWidth": 960,
