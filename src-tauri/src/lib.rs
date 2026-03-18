@@ -556,6 +556,50 @@ fn install_update(path: String) -> Result<(), String> {
     Ok(())
 }
 
+// ─── Magpie 超分辨率 ──────────────────────────────────────────
+
+/// 在资源目录或开发路径中定位 Magpie.exe
+fn find_magpie_exe(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // 生产环境：资源目录 tools/Magpie/Magpie.exe
+    if let Ok(res_dir) = app_handle.path().resource_dir() {
+        let prod = res_dir.join("tools").join("Magpie").join("Magpie.exe");
+        if prod.exists() {
+            return Ok(prod);
+        }
+    }
+    // 开发环境：项目 tools 目录
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap_or(Path::new("."))
+        .join("tools")
+        .join("Magpie-v0.12.1-x64")
+        .join("Magpie.exe");
+    if dev.exists() {
+        return Ok(dev);
+    }
+    Err("找不到 Magpie.exe，请确认工具已正确安装".to_string())
+}
+
+/// 返回 Magpie.exe 的完整路径（供前端展示），找不到返回空字符串
+#[tauri::command]
+fn get_magpie_exe_path(app_handle: tauri::AppHandle) -> String {
+    find_magpie_exe(&app_handle)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+/// 启动 Magpie.exe（若已在运行则忽略）
+#[tauri::command]
+fn launch_magpie(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let exe = find_magpie_exe(&app_handle)?;
+    let dir = exe.parent().unwrap_or(Path::new("."));
+    std::process::Command::new(&exe)
+        .current_dir(dir)
+        .spawn()
+        .map_err(|e| format!("启动 Magpie 失败: {}", e))?;
+    Ok(())
+}
+
 /// 测试 VNDB 连接（使用指定代理），返回延迟毫秒数
 #[tauri::command]
 async fn test_vndb_connection(proxy_url: String) -> Result<u64, String> {
@@ -705,6 +749,8 @@ pub fn run() {
             deepseek_test,
             deepseek_match_tags,
             deepseek_generate_mermaid,
+            get_magpie_exe_path,
+            launch_magpie,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 应用启动失败");

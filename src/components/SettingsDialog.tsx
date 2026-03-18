@@ -48,6 +48,10 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const [downloadedPath, setDownloadedPath] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
+  // Magpie
+  const [magpieEnabled, setMagpieEnabled] = useState(false);
+  const [magpiePath, setMagpiePath] = useState("");
+
   // Genre tag library state
   const [genreTags, setGenreTagsState] = useState<string[]>([]);
   const [tagLoading, setTagLoading] = useState(false);
@@ -56,13 +60,17 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
 
   useEffect(() => {
     (async () => {
-      const [key, proxy] = await Promise.all([
+      const [key, proxy, magpieOn] = await Promise.all([
         db.getSetting("deepseek_api_key"),
         db.getSetting("proxy_url"),
+        db.getSetting("magpie_enabled"),
       ]);
       setDeepseekKey(key);
       setProxyUrl(proxy);
+      setMagpieEnabled(magpieOn === "1");
       setLoading(false);
+      // get magpie path (non-blocking)
+      invoke<string>("get_magpie_exe_path").then(setMagpiePath).catch(() => {});
     })();
   }, []);
 
@@ -170,6 +178,7 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
     await Promise.all([
       db.setSetting("deepseek_api_key", deepseekKey.trim()),
       db.setSetting("proxy_url", proxyUrl.trim()),
+      db.setSetting("magpie_enabled", magpieEnabled ? "1" : "0"),
     ]);
     setSaving(false);
     onClose();
@@ -471,6 +480,52 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
                   <div className="p-3 bg-surface-2 rounded-lg text-[10px] text-text-muted space-y-1">
                     <p>• VNDB：获取游戏基本信息、封面、截图、评分、标签（使用上方代理设置）</p>
                     <p>• DeepSeek：翻译简介 + 从标签库中匹配类型标签（需要 API Key，直连不走代理）</p>
+                  </div>
+
+                  {/* Magpie */}
+                  <div className="border-t border-surface-3 pt-5 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-medium text-text-secondary flex items-center gap-1.5">
+                          <span className="text-base leading-none">✨</span>
+                          Magpie 超分辨率
+                        </p>
+                        <p className="text-[10px] text-text-muted mt-1 leading-relaxed">
+                          启动游戏时自动运行 Magpie，使用 Win+Shift+A 激活窗口缩放。
+                        </p>
+                        {magpiePath ? (
+                          <p className="text-[9px] text-text-muted/50 mt-1 font-mono truncate max-w-xs" title={magpiePath}>
+                            {magpiePath}
+                          </p>
+                        ) : (
+                          <p className="text-[9px] text-status-shelved mt-1">未找到 Magpie.exe</p>
+                        )}
+                      </div>
+                      {/* Toggle */}
+                      <button
+                        onClick={() => setMagpieEnabled((v) => !v)}
+                        disabled={!magpiePath}
+                        className={`relative shrink-0 w-10 h-5.5 rounded-full transition-colors disabled:opacity-40 ${
+                          magpieEnabled ? "bg-accent" : "bg-surface-4"
+                        }`}
+                        style={{ height: "22px" }}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                            magpieEnabled ? "translate-x-[18px]" : "translate-x-0"
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => invoke("launch_magpie")}
+                      disabled={!magpiePath}
+                      className="flex items-center gap-2 px-3 py-2 text-xs bg-surface-3 hover:bg-surface-4 disabled:opacity-40 text-text-secondary rounded-lg transition-colors"
+                    >
+                      <span className="text-sm leading-none">⚙</span>
+                      打开 Magpie 进行配置
+                    </button>
                   </div>
                 </div>
               )}

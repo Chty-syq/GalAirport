@@ -5,7 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import type { Game, GameFormData, ViewMode } from "@/types/game";
 import { useGameLibrary } from "@/hooks/useGameLibrary";
-import { useAppearance, CARD_SIZE_OPTIONS, CARD_GAP_OPTIONS } from "@/hooks/useAppearance";
+import { useAppearance, CARD_SIZE_OPTIONS } from "@/hooks/useAppearance";
 import * as db from "@/lib/database";
 import { Sidebar } from "@/components/Sidebar";
 import { Toolbar } from "@/components/Toolbar";
@@ -24,7 +24,7 @@ function App() {
   const library = useGameLibrary();
   const { appearance } = useAppearance();
   const cardMinPx = CARD_SIZE_OPTIONS.find((o) => o.value === appearance.cardSize)?.px ?? 180;
-  const cardGapCls = CARD_GAP_OPTIONS.find((o) => o.value === appearance.cardGap)?.cls ?? "gap-4";
+  const cardGapPx = ({ sm: 8, md: 16, lg: 24 } as Record<string, number>)[appearance.cardGap] ?? 16;
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [showForm, setShowForm] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
@@ -64,6 +64,11 @@ function App() {
     try {
       await invoke("launch_game", { exePath: game.exe_path, gameId: game.id });
       setRunningGameId(game.id);
+      // Auto-launch Magpie if enabled
+      const magpieEnabled = await db.getSetting("magpie_enabled");
+      if (magpieEnabled === "1") {
+        invoke("launch_magpie").catch(() => {});
+      }
     } catch (err) {
       console.error("Failed to launch game:", err);
     }
@@ -253,7 +258,7 @@ function App() {
                 </p>
               </div>
             ) : viewMode === "grid" ? (
-              <div className={`grid grid-cols-[repeat(auto-fill,minmax(${cardMinPx}px,1fr))] ${cardGapCls}`}>
+              <div className="grid" style={{ gridTemplateColumns: `repeat(auto-fill,minmax(${cardMinPx}px,1fr))`, gap: `${cardGapPx}px` }}>
                 {library.games.map((game) => (
                   <GameCard
                     key={game.id}
