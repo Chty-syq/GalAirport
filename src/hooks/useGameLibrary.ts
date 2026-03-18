@@ -9,7 +9,7 @@ export function useGameLibrary() {
   const [filterStatus, setFilterStatus] = useState<PlayStatus | "all">("all");
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterCollection, setFilterCollection] = useState<string | null>(null);
-  const [showAllGames, setShowAllGames] = useState(false);
+  const [showAllGames, setShowAllGames] = useState(true);
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [collections, setCollections] = useState<Collection[]>([]);

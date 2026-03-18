@@ -166,9 +166,15 @@ function App() {
         allTags={library.allTags}
         collections={library.collections}
         filterCollection={library.filterCollection}
-        onFilterCollection={library.setFilterCollection}
+        onFilterCollection={(id) => {
+            library.setFilterCollection(id);
+            if (id !== null) library.setShowAllGames(false);
+          }}
         showAllGames={library.showAllGames}
-        onToggleShowAllGames={() => library.setShowAllGames((v) => !v)}
+        onToggleShowAllGames={() => {
+            if (!library.showAllGames) library.setFilterCollection(null);
+            library.setShowAllGames((v) => !v);
+          }}
         allGames={library.allGames}
         onSettings={() => setShowSettings(true)}
         onHelp={() => setShowHelp(true)}
