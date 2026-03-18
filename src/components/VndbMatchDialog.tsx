@@ -486,11 +486,11 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                   )}
                   {selectedVn.rating != null && selectedVn.rating > 0 && (
                     <div className="flex justify-between items-center">
-                      <span className="text-text-muted">VNDB 评分</span>
+                      <span className="text-text-muted">评分</span>
                       <span className="text-accent flex items-center gap-1">
                         <Star className="w-3 h-3" fill="currentColor" />
                         {(selectedVn.rating / 10).toFixed(2)}
-                        <span className="text-text-muted">({selectedVn.votecount} 票)</span>
+                        <span className="text-text-muted">({selectedVn.votecount}票)</span>
                       </span>
                     </div>
                   )}
@@ -523,7 +523,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
                   <div>
                     <span className="text-xs text-text-muted flex items-center gap-1 mb-1.5">
                       <Tag className="w-3 h-3" />
-                      VNDB 标签（仅供参考）
+                      标签
                     </span>
                     <div className="flex flex-wrap gap-1">
                       {extractTags(selectedVn.tags).map((tag) => (

@@ -126,13 +126,7 @@ export function GameDetail({ game, onClose, onEdit, onLaunch, isRunning, onVndbM
                 <span className="text-text-muted">VNDB 评分</span>
                 <span className="text-accent flex items-center gap-1.5">
                   <Star className="w-3 h-3" fill="currentColor" />
-                  {vndbScore}
-                  {game.vndb_votecount > 0 && (
-                    <span className="text-text-muted flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      {game.vndb_votecount.toLocaleString()}
-                    </span>
-                  )}
+                  {vndbScore}<span className="text-text-muted">({game.vndb_votecount}票)</span>
                 </span>
               </div>
             )}

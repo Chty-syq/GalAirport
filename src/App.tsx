@@ -283,23 +283,39 @@ function App() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-1.5">
-                {library.games.map((game) => (
-                  <GameListRow
-                    key={game.id}
-                    game={game}
-                    onEdit={handleEditGame}
-                    onDelete={handleDeleteGame}
-                    onClick={setSelectedGame}
-                    onLaunch={handleLaunchGame}
-                    isRunning={runningGameId === game.id}
-                    selectionMode={selectionMode}
-                    isSelected={selectedIds.has(game.id)}
-                    onToggleSelect={toggleSelectGame}
-                    onStatusChange={handleStatusChange}
-                    onWalkthrough={setWalkthroughGame}
-                  />
-                ))}
+              <div>
+                {/* Column header */}
+                <div className="flex items-stretch mb-2 border-b border-surface-3/50 pb-2 pl-px pr-px">
+                  {/* accent bar placeholder — pl-px compensates for the 1px border on each row */}
+                  <div className="w-[3px] flex-shrink-0" />
+                  <div className="flex items-center gap-3 flex-1 px-3 text-[10px] font-semibold uppercase tracking-widest text-text-muted/50">
+                    {selectionMode && <div className="w-5 flex-shrink-0" />}
+                    <div className="w-11 flex-shrink-0" />
+                    <div className="flex-1">游戏</div>
+                    <div className="w-24 text-right flex-shrink-0">评分</div>
+                    <div className="w-[92px] text-right flex-shrink-0">状态</div>
+                    <div className="w-24 text-right flex-shrink-0">游玩时长</div>
+                    <div className="w-[118px] flex-shrink-0" />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  {library.games.map((game) => (
+                    <GameListRow
+                      key={game.id}
+                      game={game}
+                      onEdit={handleEditGame}
+                      onDelete={handleDeleteGame}
+                      onClick={setSelectedGame}
+                      onLaunch={handleLaunchGame}
+                      isRunning={runningGameId === game.id}
+                      selectionMode={selectionMode}
+                      isSelected={selectedIds.has(game.id)}
+                      onToggleSelect={toggleSelectGame}
+                      onStatusChange={handleStatusChange}
+                      onWalkthrough={setWalkthroughGame}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>
