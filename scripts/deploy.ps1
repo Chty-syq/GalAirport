@@ -1,13 +1,13 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    GalAirport 版本升级 & 发布脚本
+    GalAirport version bump and release script
 
 .PARAMETER Type
-    升级类型：major | minor | patch（默认 patch）
+    major | minor | patch (default: patch)
 
 .PARAMETER Version
-    直接指定目标版本号，格式 x.y.z
+    Specify target version directly, e.g. 2.0.0
 
 .EXAMPLE
     .\scripts\deploy.ps1
@@ -17,28 +17,28 @@
 #>
 
 param(
-    [ValidateSet("major", "minor", "patch")]
-    [string]$Type = "patch",
-    [string]$Version = ""
+    [ValidateSet('major', 'minor', 'patch')]
+    [string]$Type = 'patch',
+    [string]$Version = ''
 )
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
 $Root        = Split-Path $PSScriptRoot -Parent
-$PackageJson = Join-Path $Root "package.json"
+$PackageJson = Join-Path $Root 'package.json'
 
 if (-not (Test-Path $PackageJson)) {
-    Write-Error "找不到 package.json: $PackageJson"
+    Write-Error "Cannot find package.json: $PackageJson"
     exit 1
 }
 
-# ── 读取当前版本 ──────────────────────────────────────────────
+# ---- read current version -----------------------------------------------
 $pkg     = Get-Content $PackageJson -Raw | ConvertFrom-Json
 $current = $pkg.version
 
 if ($current -notmatch '^\d+\.\d+\.\d+$') {
-    Write-Error "版本号格式不合法: $current"
+    Write-Error "Invalid version in package.json: $current"
     exit 1
 }
 
@@ -47,73 +47,72 @@ $parts = $current -split '\.'
 [int]$minor = $parts[1]
 [int]$patch = $parts[2]
 
-# ── 计算新版本 ────────────────────────────────────────────────
-if ($Version -ne "") {
+# ---- calculate new version -----------------------------------------------
+if ($Version -ne '') {
     if ($Version -notmatch '^\d+\.\d+\.\d+$') {
-        Write-Error "版本号格式不合法，应为 x.y.z，得到: $Version"
+        Write-Error "Invalid version format (expected x.y.z): $Version"
         exit 1
     }
     $newVersion = $Version
 } else {
     switch ($Type) {
-        "major" { $major++; $minor = 0; $patch = 0 }
-        "minor" { $minor++; $patch = 0 }
-        "patch" { $patch++ }
+        'major' { $major++; $minor = 0; $patch = 0 }
+        'minor' { $minor++; $patch = 0 }
+        'patch' { $patch++ }
     }
     $newVersion = "$major.$minor.$patch"
 }
 
 if ($newVersion -eq $current) {
-    Write-Host "当前版本已是 $current，无需升级。" -ForegroundColor Yellow
+    Write-Host "Already at $current, nothing to do." -ForegroundColor Yellow
     exit 0
 }
 
-Write-Host ""
-Write-Host "  $current  →  $newVersion" -ForegroundColor Green
-Write-Host ""
+Write-Host ''
+Write-Host "  $current  ->  $newVersion" -ForegroundColor Green
+Write-Host ''
 
-# ── 检查工作区是否干净 ────────────────────────────────────────
+# ---- check working tree --------------------------------------------------
 Push-Location $Root
 try {
     $dirty = git status --porcelain 2>&1
     if ($dirty) {
-        Write-Host "工作区有未提交的改动：" -ForegroundColor Yellow
+        Write-Host 'Uncommitted changes detected:' -ForegroundColor Yellow
         Write-Host $dirty -ForegroundColor DarkGray
-        $go = Read-Host "仍然继续？[y/N]"
+        $go = Read-Host 'Continue anyway? [y/N]'
         if ($go -notmatch '^[Yy]') {
-            Write-Host "已取消。" -ForegroundColor Yellow
+            Write-Host 'Cancelled.' -ForegroundColor Yellow
             exit 0
         }
     }
 
-    # ── 写入 package.json ─────────────────────────────────────
+    # ---- write package.json ----------------------------------------------
     $pkg.version = $newVersion
     $bytes = [System.Text.Encoding]::UTF8.GetBytes(($pkg | ConvertTo-Json -Depth 10) + "`n")
     [System.IO.File]::WriteAllBytes($PackageJson, $bytes)
-    Write-Host "  ✓ package.json 已更新" -ForegroundColor Green
+    Write-Host '  OK  package.json updated' -ForegroundColor Green
 
-    # ── Git 操作 ──────────────────────────────────────────────
-    Write-Host ""
-    Write-Host "执行 Git 操作..." -ForegroundColor Cyan
+    # ---- git operations --------------------------------------------------
+    Write-Host ''
+    Write-Host 'Running git...' -ForegroundColor Cyan
 
     git add package.json
-    if ($LASTEXITCODE -ne 0) { throw "git add 失败" }
-    Write-Host "  ✓ git add" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) { throw 'git add failed' }
+    Write-Host '  OK  git add' -ForegroundColor Green
 
     git commit -m "v$newVersion"
-    if ($LASTEXITCODE -ne 0) { throw "git commit 失败" }
-    Write-Host "  ✓ git commit `"v$newVersion`"" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) { throw 'git commit failed' }
+    Write-Host "  OK  git commit v$newVersion" -ForegroundColor Green
 
     git tag "v$newVersion"
-    if ($LASTEXITCODE -ne 0) { throw "git tag 失败" }
-    Write-Host "  ✓ git tag v$newVersion" -ForegroundColor Green
+    if ($LASTEXITCODE -ne 0) { throw 'git tag failed' }
+    Write-Host "  OK  git tag v$newVersion" -ForegroundColor Green
 
-    Write-Host ""
-    Write-Host "发布完成：v$newVersion" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "推送到远端：" -ForegroundColor DarkGray
-    Write-Host "  git push && git push --tags" -ForegroundColor DarkGray
-    Write-Host ""
+    Write-Host ''
+    Write-Host "Released: v$newVersion" -ForegroundColor Green
+    Write-Host ''
+    Write-Host 'To push:  git push; git push --tags' -ForegroundColor DarkGray
+    Write-Host ''
 
 } finally {
     Pop-Location
