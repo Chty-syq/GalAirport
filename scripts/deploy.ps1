@@ -108,10 +108,16 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'git tag failed' }
     Write-Host "  OK  git tag v$newVersion" -ForegroundColor Green
 
+    git push
+    if ($LASTEXITCODE -ne 0) { throw 'git push failed' }
+    Write-Host '  OK  git push' -ForegroundColor Green
+
+    git push --tags
+    if ($LASTEXITCODE -ne 0) { throw 'git push --tags failed' }
+    Write-Host '  OK  git push --tags' -ForegroundColor Green
+
     Write-Host ''
     Write-Host "Released: v$newVersion" -ForegroundColor Green
-    Write-Host ''
-    Write-Host 'To push:  git push; git push --tags' -ForegroundColor DarkGray
     Write-Host ''
 
 } finally {
