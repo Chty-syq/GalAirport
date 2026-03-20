@@ -175,8 +175,7 @@ export function VndbMatchDialog({ game, onClose, onApply }: Props) {
       })();
 
       const descPromise = (async () => {
-        if (game.notes) return game.notes;
-        if (!selectedVn.description) return "";
+        if (!selectedVn.description) return game.notes || "";
         const cleaned = cleanDescription(selectedVn.description);
         if (apiKey) {
           try {
