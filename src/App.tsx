@@ -43,7 +43,8 @@ function App() {
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [live2dEvent, setLive2dEvent] = useState<Live2DEvent>(null);
   const [live2dEnabled, setLive2dEnabled] = useState(false);
-  const [live2dHeight, setLive2dHeight] = useState(200);
+  const [live2dHeight, setLive2dHeight] = useState(45);
+  const [live2dModel, setLive2dModel] = useState("Murasame");
 
   // Listen for playtime session ended events from Rust
   useEffect(() => {
@@ -65,7 +66,8 @@ function App() {
 
   const refreshLive2dEnabled = useCallback(() => {
     db.getSetting("live2d_enabled").then((v) => setLive2dEnabled(v === "1"));
-    db.getSetting("live2d_height").then((v) => { if (v) setLive2dHeight(Number(v)); });
+    db.getSetting("live2d_height").then((v) => { if (v && Number(v) <= 100) setLive2dHeight(Number(v)); });
+    db.getSetting("live2d_model").then((v) => { if (v) setLive2dModel(v); });
   }, []);
 
   useEffect(() => { refreshLive2dEnabled(); }, [refreshLive2dEnabled]);
@@ -391,6 +393,7 @@ function App() {
           onClose={() => { setShowSettings(false); refreshLive2dEnabled(); }}
           onLive2dChange={(en) => setLive2dEnabled(en)}
           onLive2dHeightChange={(h) => setLive2dHeight(h)}
+          onLive2dModelChange={(m) => setLive2dModel(m)}
         />
       )}
 
@@ -440,6 +443,7 @@ function App() {
       {/* Live2D Widget */}
       <Live2DWidget
         enabled={live2dEnabled}
+        modelId={live2dModel}
         visibleHeight={live2dHeight}
         event={live2dEvent}
         onSettings={() => setShowSettings(true)}

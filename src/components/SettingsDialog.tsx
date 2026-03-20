@@ -6,6 +6,7 @@ import * as db from "@/lib/database";
 import { testApiKey } from "@/lib/deepseek";
 import { useTheme, THEME_LIST } from "@/hooks/useTheme";
 import { useAppearance, CARD_SIZE_OPTIONS, CARD_GAP_OPTIONS } from "@/hooks/useAppearance";
+import { MODEL_LIST } from "@/components/Live2DWidget/models";
 
 const GITHUB_REPO = "Chty-syq/GalAirport";
 
@@ -13,6 +14,7 @@ interface Props {
   onClose: () => void;
   onLive2dChange?: (enabled: boolean) => void;
   onLive2dHeightChange?: (height: number) => void;
+  onLive2dModelChange?: (modelId: string) => void;
 }
 
 type SettingsTab = "appearance" | "api" | "tags" | "live2d" | "about";
@@ -25,7 +27,7 @@ interface UpdateInfo {
   download_url: string;
 }
 
-export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHeightChange }: Props & { initialTab?: SettingsTab }) {
+export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHeightChange, onLive2dModelChange }: Props & { initialTab?: SettingsTab }) {
   const { theme, setTheme } = useTheme();
   const { appearance, setAppearance } = useAppearance();
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
@@ -56,7 +58,8 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
 
   // Live2D
   const [live2dEnabled, setLive2dEnabled] = useState(false);
-  const [live2dHeight, setLive2dHeight] = useState(200);
+  const [live2dHeight, setLive2dHeight] = useState(45);
+  const [live2dModel, setLive2dModel] = useState("Murasame");
 
   // Genre tag library state
   const [genreTags, setGenreTagsState] = useState<string[]>([]);
@@ -66,18 +69,20 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
 
   useEffect(() => {
     (async () => {
-      const [key, proxy, magpieOn, live2dOn, live2dH] = await Promise.all([
+      const [key, proxy, magpieOn, live2dOn, live2dH, live2dM] = await Promise.all([
         db.getSetting("deepseek_api_key"),
         db.getSetting("proxy_url"),
         db.getSetting("magpie_enabled"),
         db.getSetting("live2d_enabled"),
         db.getSetting("live2d_height"),
+        db.getSetting("live2d_model"),
       ]);
       setDeepseekKey(key);
       setProxyUrl(proxy);
       setMagpieEnabled(magpieOn === "1");
       setLive2dEnabled(live2dOn === "1");
-      if (live2dH) setLive2dHeight(Number(live2dH));
+      if (live2dH && Number(live2dH) <= 100) setLive2dHeight(Number(live2dH));
+      if (live2dM) setLive2dModel(live2dM);
       setLoading(false);
       // get magpie path (non-blocking)
       invoke<string>("get_magpie_exe_path").then(setMagpiePath).catch(() => {});
@@ -191,6 +196,7 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
       db.setSetting("magpie_enabled", magpieEnabled ? "1" : "0"),
       db.setSetting("live2d_enabled", live2dEnabled ? "1" : "0"),
       db.setSetting("live2d_height", String(live2dHeight)),
+      db.setSetting("live2d_model", live2dModel),
     ]);
     setSaving(false);
     onClose();
@@ -658,13 +664,13 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
                 <div className="flex items-center justify-between py-3 border-b border-surface-3">
                   <div>
                     <p className="text-xs font-medium text-text-primary">显示高度</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">120 ~ 300 px，当前 {live2dHeight} px</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">当前 {live2dHeight}%</p>
                   </div>
                   <input
                     type="range"
-                    min={120}
-                    max={300}
-                    step={10}
+                    min={0}
+                    max={100}
+                    step={5}
                     value={live2dHeight}
                     onChange={(e) => {
                       const v = Number(e.target.value);
@@ -673,6 +679,31 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
                     }}
                     className="w-28 accent-accent"
                   />
+                </div>
+
+                {/* Model selector */}
+                <div className="py-3 border-b border-surface-3">
+                  <p className="text-xs font-medium text-text-primary mb-2">选择角色</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MODEL_LIST.map((m) => (
+                      <button
+                        key={m.id}
+                        disabled={m.unsupported}
+                        onClick={() => { if (!m.unsupported) { setLive2dModel(m.id); onLive2dModelChange?.(m.id); } }}
+                        title={m.unsupported ? "Cubism 2 格式，暂不支持" : m.name}
+                        className={`px-3 py-2 rounded-lg text-xs text-left transition-colors border ${
+                          m.unsupported
+                            ? "opacity-40 cursor-not-allowed bg-surface-2 border-transparent text-text-muted"
+                            : live2dModel === m.id
+                              ? "bg-accent/15 border-accent/40 text-accent font-medium"
+                              : "bg-surface-2 border-transparent text-text-secondary hover:bg-surface-3"
+                        }`}
+                      >
+                        {m.name}
+                        {m.unsupported && <span className="block text-[9px] text-text-muted/60">不支持</span>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Reset position */}
