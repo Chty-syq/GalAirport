@@ -24,6 +24,7 @@ interface Props {
   allGames: { collection_id: string | null }[];
   onSettings: () => void;
   onHelp: () => void;
+  live2dEnabled: boolean;
 }
 
 const STATUS_OPTIONS: { value: PlayStatus; label: string; dot: string }[] = [
@@ -48,6 +49,7 @@ export function Sidebar({
   allGames,
   onSettings,
   onHelp,
+  live2dEnabled,
 }: Props) {
   const [avatar, setAvatar] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -273,23 +275,25 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* 底部操作 */}
-      <div className="px-3 py-3 border-t border-surface-3/60 space-y-0.5">
-        <button
-          onClick={onSettings}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
-        >
-          <Settings className="w-3.5 h-3.5" />
-          设置
-        </button>
-        <button
-          onClick={onHelp}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
-        >
-          <HelpCircle className="w-3.5 h-3.5" />
-          使用帮助
-        </button>
-      </div>
+      {/* 底部操作：live2d 启用时由 widget 侧圆形按钮替代 */}
+      {!live2dEnabled && (
+        <div className="px-3 py-3 border-t border-surface-3/60 space-y-0.5">
+          <button
+            onClick={onSettings}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            设置
+          </button>
+          <button
+            onClick={onHelp}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            使用帮助
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw, Globe, Info, RefreshCw, ArrowUpCircle, Download } from "lucide-react";
+import { X, Key, Loader2, CheckCircle2, AlertCircle, Tag, Plus, Palette, Check, RotateCcw, Globe, Info, RefreshCw, ArrowUpCircle, Download, Sparkles } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import * as db from "@/lib/database";
@@ -11,9 +11,11 @@ const GITHUB_REPO = "Chty-syq/GalAirport";
 
 interface Props {
   onClose: () => void;
+  onLive2dChange?: (enabled: boolean) => void;
+  onLive2dHeightChange?: (height: number) => void;
 }
 
-type SettingsTab = "appearance" | "api" | "tags" | "about";
+type SettingsTab = "appearance" | "api" | "tags" | "live2d" | "about";
 
 interface UpdateInfo {
   has_update: boolean;
@@ -23,7 +25,7 @@ interface UpdateInfo {
   download_url: string;
 }
 
-export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: SettingsTab }) {
+export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHeightChange }: Props & { initialTab?: SettingsTab }) {
   const { theme, setTheme } = useTheme();
   const { appearance, setAppearance } = useAppearance();
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
@@ -52,6 +54,10 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
   const [magpieEnabled, setMagpieEnabled] = useState(false);
   const [magpiePath, setMagpiePath] = useState("");
 
+  // Live2D
+  const [live2dEnabled, setLive2dEnabled] = useState(false);
+  const [live2dHeight, setLive2dHeight] = useState(200);
+
   // Genre tag library state
   const [genreTags, setGenreTagsState] = useState<string[]>([]);
   const [tagLoading, setTagLoading] = useState(false);
@@ -60,14 +66,18 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
 
   useEffect(() => {
     (async () => {
-      const [key, proxy, magpieOn] = await Promise.all([
+      const [key, proxy, magpieOn, live2dOn, live2dH] = await Promise.all([
         db.getSetting("deepseek_api_key"),
         db.getSetting("proxy_url"),
         db.getSetting("magpie_enabled"),
+        db.getSetting("live2d_enabled"),
+        db.getSetting("live2d_height"),
       ]);
       setDeepseekKey(key);
       setProxyUrl(proxy);
       setMagpieEnabled(magpieOn === "1");
+      setLive2dEnabled(live2dOn === "1");
+      if (live2dH) setLive2dHeight(Number(live2dH));
       setLoading(false);
       // get magpie path (non-blocking)
       invoke<string>("get_magpie_exe_path").then(setMagpiePath).catch(() => {});
@@ -179,6 +189,8 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
       db.setSetting("deepseek_api_key", deepseekKey.trim()),
       db.setSetting("proxy_url", proxyUrl.trim()),
       db.setSetting("magpie_enabled", magpieEnabled ? "1" : "0"),
+      db.setSetting("live2d_enabled", live2dEnabled ? "1" : "0"),
+      db.setSetting("live2d_height", String(live2dHeight)),
     ]);
     setSaving(false);
     onClose();
@@ -235,6 +247,17 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
           >
             <Tag className="w-3 h-3 inline mr-1.5" />
             标签
+          </button>
+          <button
+            onClick={() => setTab("live2d")}
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              tab === "live2d"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <Sparkles className="w-3 h-3 inline mr-1.5" />
+            看板娘
           </button>
           <button
             onClick={() => setTab("about")}
@@ -605,6 +628,70 @@ export function SettingsDialog({ onClose, initialTab }: Props & { initialTab?: S
               )}
             </div>
           )}
+          {tab === "live2d" && (
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs font-medium text-text-secondary mb-1">看板娘</p>
+                <p className="text-[10px] text-text-muted mb-4">丛雨会出现在界面右下角，点击她可触发互动。</p>
+
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between py-3 border-b border-surface-3">
+                  <div>
+                    <p className="text-xs font-medium text-text-primary">显示看板娘</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">开启后丛雨将守护你的游戏库</p>
+                  </div>
+                  <button
+                    onClick={() => { const v = !live2dEnabled; setLive2dEnabled(v); onLive2dChange?.(v); }}
+                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                      live2dEnabled ? "bg-accent" : "bg-surface-4"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        live2dEnabled ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Height slider */}
+                <div className="flex items-center justify-between py-3 border-b border-surface-3">
+                  <div>
+                    <p className="text-xs font-medium text-text-primary">显示高度</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">120 ~ 300 px，当前 {live2dHeight} px</p>
+                  </div>
+                  <input
+                    type="range"
+                    min={120}
+                    max={300}
+                    step={10}
+                    value={live2dHeight}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      setLive2dHeight(v);
+                      onLive2dHeightChange?.(v);
+                    }}
+                    className="w-28 accent-accent"
+                  />
+                </div>
+
+                {/* Reset position */}
+                <div className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="text-xs font-medium text-text-primary">重置位置</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">将丛雨移回右下角默认位置</p>
+                  </div>
+                  <button
+                    onClick={() => localStorage.removeItem("live2d-pos")}
+                    className="px-3 py-1.5 text-xs bg-surface-2 hover:bg-surface-3 text-text-secondary rounded-lg transition-colors"
+                  >
+                    重置
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {tab === "about" && (
             <div className="space-y-4">
               {/* Hero banner */}

@@ -5,6 +5,7 @@ import path from "path";
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
   plugins: [react()],
+  publicDir: "live2d",
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

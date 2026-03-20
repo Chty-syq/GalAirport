@@ -292,3 +292,10 @@ body {
 .dialog-overlay {
   background: var(--overlay-bg);
 }
+
+/* ─── Live2D Widget ─────────────────────────────────────────── */
+
+@keyframes live2d-bubble-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)   scale(1); }
+}
