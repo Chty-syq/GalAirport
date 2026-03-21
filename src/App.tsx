@@ -19,6 +19,7 @@ import { SettingsDialog } from "@/components/SettingsDialog";
 import { CollectionManagerDialog } from "@/components/CollectionDialog";
 import { HelpDialog } from "@/components/HelpDialog";
 import { WalkthroughDialog } from "@/components/WalkthroughDialog";
+import { FortuneDialog } from "@/components/FortuneDialog";
 import { Live2DWidget } from "@/components/Live2DWidget";
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
   const [vndbMatchGame, setVndbMatchGame] = useState<Game | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [showFortune, setShowFortune] = useState(false);
   const [showCollectionDialog, setShowCollectionDialog] = useState(false);
   const [runningGameId, setRunningGameId] = useState<string | null>(null);
   const [walkthroughGame, setWalkthroughGame] = useState<Game | null>(null);
@@ -400,6 +402,14 @@ function App() {
         <HelpDialog onClose={() => setShowHelp(false)} />
       )}
 
+      {showFortune && (
+        <FortuneDialog
+          games={library.games}
+          onClose={() => setShowFortune(false)}
+          onLaunch={(game) => { handleLaunchGame(game); setShowFortune(false); }}
+        />
+      )}
+
       {showCollectionDialog && (
         <CollectionManagerDialog
           onClose={() => setShowCollectionDialog(false)}
@@ -447,6 +457,7 @@ function App() {
         showHitAreas={live2dShowHitAreas}
         onSettings={() => setShowSettings(true)}
         onHelp={() => setShowHelp(true)}
+        onFortune={() => setShowFortune(true)}
       />
 
       {/* Delete confirmation */}

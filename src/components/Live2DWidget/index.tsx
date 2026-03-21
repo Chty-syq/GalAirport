@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Settings, HelpCircle } from "lucide-react";
+import { Settings, HelpCircle, Sparkles } from "lucide-react";
 import { Bubble } from "./Bubble";
 import { MODEL_LIST, DEFAULT_MODEL_ID } from "./models";
 
@@ -9,21 +9,12 @@ const CUBISM_CORE_URL = "/live2dcubismcore.min.js";
 const CUBISM2_SDK_URL = "/live2d.min.js";
 
 // 圆形按钮弧形布局（以 canvas 坐标系为基准）
-const ARC_CENTER = { x: SIDEBAR_W / 2, y: 100 };
-const ARC_RADIUS = 80;
-const BTN_SIZE = 36;
-const ARC_BTNS = [
-  { key: "settings", angleDeg: 40 },
-  { key: "help",     angleDeg: 70 },
+const BTN_SIZE = 34;
+const BTNS = [
+  { key: "fortune",  title: "今日运势" },
+  { key: "settings", title: "设置" },
+  { key: "help",     title: "帮助" },
 ];
-
-function arcPos(angleDeg: number) {
-  const rad = (angleDeg * Math.PI) / 180;
-  return {
-    x: ARC_CENTER.x + ARC_RADIUS * Math.sin(rad) - BTN_SIZE / 2,
-    y: ARC_CENTER.y - ARC_RADIUS * Math.cos(rad) - BTN_SIZE / 2,
-  };
-}
 
 function loadScript(src: string, globalCheck: () => boolean): Promise<void> {
   if (globalCheck()) return Promise.resolve();
@@ -114,6 +105,7 @@ interface Props {
   showHitAreas?: boolean;
   onSettings: () => void;
   onHelp: () => void;
+  onFortune: () => void;
 }
 
 export function Live2DWidget({
@@ -123,6 +115,7 @@ export function Live2DWidget({
   showHitAreas = false,
   onSettings,
   onHelp,
+  onFortune,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -425,6 +418,7 @@ export function Live2DWidget({
         </div>
       )}
 
+      {/* Live2D 画布容器 */}
       <div
         className="fixed z-[100] bottom-0 left-0 select-none overflow-hidden"
         style={{
@@ -433,23 +427,31 @@ export function Live2DWidget({
           transition: "height 0.4s ease",
         }}
       >
-        {/* Live2D canvas 由 init() 动态创建并挂载到此容器 */}
         <div
           ref={containerRef}
           className="absolute top-0 left-0 w-full h-full"
           style={{ zIndex: 0 }}
         />
+      </div>
 
-        {/* 弧形按钮 */}
-        {ARC_BTNS.map(({ key, angleDeg }, i) => {
-          const pos = arcPos(angleDeg);
-          const isSettings = key === "settings";
+      {/* 竖排按钮 — 独立于画布，始终显示在侧边栏右下角 */}
+      <div
+        className="fixed bottom-2 z-[101] flex flex-col gap-1.5"
+        style={{ left: SIDEBAR_W - BTN_SIZE - 8 }}
+      >
+        {BTNS.map(({ key, title }, i) => {
+          const onClick = key === "settings" ? onSettings : key === "help" ? onHelp : onFortune;
+          const icon = key === "settings"
+            ? <Settings className="w-4 h-4" />
+            : key === "help"
+            ? <HelpCircle className="w-4 h-4" />
+            : <Sparkles className="w-4 h-4" />;
           return (
             <button
               key={key}
-              onClick={isSettings ? onSettings : onHelp}
-              title={isSettings ? "设置" : "帮助"}
-              className="absolute flex items-center justify-center rounded-full
+              onClick={onClick}
+              title={title}
+              className="flex items-center justify-center rounded-full
                          bg-surface-1/75 backdrop-blur-sm border border-surface-3/60
                          hover:bg-surface-2 hover:border-accent/40 hover:scale-110
                          text-text-secondary hover:text-accent
@@ -457,14 +459,10 @@ export function Live2DWidget({
               style={{
                 width: BTN_SIZE,
                 height: BTN_SIZE,
-                left: pos.x,
-                top: pos.y,
-                zIndex: 1,
-                opacity: modelReady || modelFailed ? 1 : 0,
-                transitionDelay: `${i * 60}ms`,
+                transitionDelay: `${i * 50}ms`,
               }}
             >
-              {isSettings ? <Settings className="w-4 h-4" /> : <HelpCircle className="w-4 h-4" />}
+              {icon}
             </button>
           );
         })}
