@@ -181,20 +181,22 @@ export function Live2DWidget({
         } catch { /* 解析失败则无交互文字 */ }
 
         if (cubism4) {
-          await loadCubismCore();
+          try { await loadCubismCore(); } catch (e) { throw new Error(`SDK(cubism4): ${e}`); }
         } else {
-          await loadCubism2SDK();
+          try { await loadCubism2SDK(); } catch (e) { throw new Error(`SDK(cubism2): ${e}`); }
         }
         if (destroyed) return;
 
         const PIXI = await import("pixi.js");
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let Live2DModel: any;
-        if (cubism4) {
-          ({ Live2DModel } = await import("pixi-live2d-display/cubism4"));
-        } else {
-          ({ Live2DModel } = await import("pixi-live2d-display/cubism2"));
-        }
+        try {
+          if (cubism4) {
+            ({ Live2DModel } = await import("pixi-live2d-display/cubism4"));
+          } else {
+            ({ Live2DModel } = await import("pixi-live2d-display/cubism2"));
+          }
+        } catch (e) { throw new Error(`import(pixi-live2d-display): ${e}`); }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Live2DModel.registerTicker(PIXI.Ticker as any);
         if (destroyed) return;
@@ -215,7 +217,7 @@ export function Live2DWidget({
           autoDensity: true,
         });
 
-        const model = await Live2DModel.from(modelUrl, { autoInteract: false });
+        const model = await Live2DModel.from(modelUrl, { autoInteract: false }).catch((e: unknown) => { throw new Error(`Live2DModel.from: ${e}`); });
 
         if (destroyed) {
           model.destroy();
@@ -372,7 +374,8 @@ export function Live2DWidget({
         try { app?.destroy(true); } catch { /* ignore */ }
         if (!app && canvas) canvas.remove();
         if (!destroyed) setModelFailed(true);
-        showBubble("模型加载失败", 4000);
+        const msg = err instanceof Error ? err.message : String(err);
+        showBubble(`加载失败: ${msg}`, 8000);
       }
     };
 
