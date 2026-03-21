@@ -5,8 +5,7 @@ import { MODEL_LIST, DEFAULT_MODEL_ID } from "./models";
 
 // 宽度匹配侧边栏 w-56 = 224px
 const SIDEBAR_W = 224;
-const CUBISM_CORE_CDN =
-  "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js";
+const CUBISM_CORE_URL = "/live2dcubismcore.min.js";
 const CUBISM2_SDK_URL = "/live2d.min.js";
 
 // 圆形按钮弧形布局（以 canvas 坐标系为基准）
@@ -45,7 +44,7 @@ function loadScript(src: string, globalCheck: () => boolean): Promise<void> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const loadCubismCore = () => loadScript(CUBISM_CORE_CDN, () => !!(window as any).Live2DCubismCore);
+const loadCubismCore = () => loadScript(CUBISM_CORE_URL, () => !!(window as any).Live2DCubismCore);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const loadCubism2SDK = () => loadScript(CUBISM2_SDK_URL, () => !!(window as any).Live2D);
 
@@ -136,6 +135,7 @@ export function Live2DWidget({
 
   const [visibleH, setVisibleH] = useState(0);
   const [modelReady, setModelReady] = useState(false);
+  const [modelFailed, setModelFailed] = useState(false);
   const [bubbleText, setBubbleText] = useState("");
   const bubbleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,6 +157,7 @@ export function Live2DWidget({
     }
 
     let destroyed = false;
+    setModelFailed(false);
 
     const init = async () => {
       // 清除容器内可能残留的旧 canvas（异常退出时未清理的情况）
@@ -370,6 +371,7 @@ export function Live2DWidget({
         // 清理部分初始化的资源，防止残留 canvas 影响下次加载
         try { app?.destroy(true); } catch { /* ignore */ }
         if (!app && canvas) canvas.remove();
+        if (!destroyed) setModelFailed(true);
         showBubble("模型加载失败", 4000);
       }
     };
@@ -424,7 +426,7 @@ export function Live2DWidget({
         className="fixed z-[100] bottom-0 left-0 select-none overflow-hidden"
         style={{
           width: SIDEBAR_W,
-          height: visibleH,
+          height: modelFailed ? 100 : visibleH,
           transition: "height 0.4s ease",
         }}
       >
@@ -455,7 +457,7 @@ export function Live2DWidget({
                 left: pos.x,
                 top: pos.y,
                 zIndex: 1,
-                opacity: modelReady ? 1 : 0,
+                opacity: modelReady || modelFailed ? 1 : 0,
                 transitionDelay: `${i * 60}ms`,
               }}
             >
