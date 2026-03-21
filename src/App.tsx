@@ -19,7 +19,7 @@ import { SettingsDialog } from "@/components/SettingsDialog";
 import { CollectionManagerDialog } from "@/components/CollectionDialog";
 import { HelpDialog } from "@/components/HelpDialog";
 import { WalkthroughDialog } from "@/components/WalkthroughDialog";
-import { Live2DWidget, type Live2DEvent } from "@/components/Live2DWidget";
+import { Live2DWidget } from "@/components/Live2DWidget";
 
 function App() {
   const library = useGameLibrary();
@@ -41,10 +41,10 @@ function App() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
-  const [live2dEvent, setLive2dEvent] = useState<Live2DEvent>(null);
   const [live2dEnabled, setLive2dEnabled] = useState(false);
   const [live2dHeight, setLive2dHeight] = useState(45);
   const [live2dModel, setLive2dModel] = useState("Murasame");
+  const [live2dShowHitAreas, setLive2dShowHitAreas] = useState(false);
 
   // Listen for playtime session ended events from Rust
   useEffect(() => {
@@ -68,6 +68,7 @@ function App() {
     db.getSetting("live2d_enabled").then((v) => setLive2dEnabled(v === "1"));
     db.getSetting("live2d_height").then((v) => { if (v && Number(v) <= 100) setLive2dHeight(Number(v)); });
     db.getSetting("live2d_model").then((v) => { if (v) setLive2dModel(v); });
+    db.getSetting("live2d_show_hitareas").then((v) => setLive2dShowHitAreas(v === "1"));
   }, []);
 
   useEffect(() => { refreshLive2dEnabled(); }, [refreshLive2dEnabled]);
@@ -103,8 +104,7 @@ function App() {
       await library.updateGame(editingGame.id, data);
     } else {
       await library.addGame(data);
-      setLive2dEvent({ type: "gameAdded", key: Date.now() });
-    }
+}
     setShowForm(false);
     setEditingGame(null);
   };
@@ -158,9 +158,6 @@ function App() {
   const handleStatusChange = useCallback(async (id: string, status: import("@/types/game").PlayStatus) => {
     await library.updateGame(id, { play_status: status });
     setSelectedGame((prev) => prev?.id === id ? { ...prev, play_status: status } : prev);
-    if (status === "completed") {
-      setLive2dEvent({ type: "gameCompleted", key: Date.now() });
-    }
   }, [library]);
 
   const confirmBulkDelete = async () => {
@@ -286,6 +283,7 @@ function App() {
                   <GameCard
                     key={game.id}
                     game={game}
+                    cardSize={appearance.cardSize}
                     onEdit={handleEditGame}
                     onDelete={handleDeleteGame}
                     onClick={setSelectedGame}
@@ -394,6 +392,7 @@ function App() {
           onLive2dChange={(en) => setLive2dEnabled(en)}
           onLive2dHeightChange={(h) => setLive2dHeight(h)}
           onLive2dModelChange={(m) => setLive2dModel(m)}
+          onLive2dShowHitAreasChange={(v) => setLive2dShowHitAreas(v)}
         />
       )}
 
@@ -445,7 +444,7 @@ function App() {
         enabled={live2dEnabled}
         modelId={live2dModel}
         visibleHeight={live2dHeight}
-        event={live2dEvent}
+        showHitAreas={live2dShowHitAreas}
         onSettings={() => setShowSettings(true)}
         onHelp={() => setShowHelp(true)}
       />

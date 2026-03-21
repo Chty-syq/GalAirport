@@ -15,6 +15,7 @@ interface Props {
   onLive2dChange?: (enabled: boolean) => void;
   onLive2dHeightChange?: (height: number) => void;
   onLive2dModelChange?: (modelId: string) => void;
+  onLive2dShowHitAreasChange?: (show: boolean) => void;
 }
 
 type SettingsTab = "appearance" | "api" | "tags" | "live2d" | "about";
@@ -27,7 +28,7 @@ interface UpdateInfo {
   download_url: string;
 }
 
-export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHeightChange, onLive2dModelChange }: Props & { initialTab?: SettingsTab }) {
+export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHeightChange, onLive2dModelChange, onLive2dShowHitAreasChange }: Props & { initialTab?: SettingsTab }) {
   const { theme, setTheme } = useTheme();
   const { appearance, setAppearance } = useAppearance();
   const [tab, setTab] = useState<SettingsTab>(initialTab ?? "appearance");
@@ -60,6 +61,7 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
   const [live2dEnabled, setLive2dEnabled] = useState(false);
   const [live2dHeight, setLive2dHeight] = useState(45);
   const [live2dModel, setLive2dModel] = useState("Murasame");
+  const [live2dShowHitAreas, setLive2dShowHitAreas] = useState(false);
 
   // Genre tag library state
   const [genreTags, setGenreTagsState] = useState<string[]>([]);
@@ -69,13 +71,14 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
 
   useEffect(() => {
     (async () => {
-      const [key, proxy, magpieOn, live2dOn, live2dH, live2dM] = await Promise.all([
+      const [key, proxy, magpieOn, live2dOn, live2dH, live2dM, live2dHa] = await Promise.all([
         db.getSetting("deepseek_api_key"),
         db.getSetting("proxy_url"),
         db.getSetting("magpie_enabled"),
         db.getSetting("live2d_enabled"),
         db.getSetting("live2d_height"),
         db.getSetting("live2d_model"),
+        db.getSetting("live2d_show_hitareas"),
       ]);
       setDeepseekKey(key);
       setProxyUrl(proxy);
@@ -83,6 +86,7 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
       setLive2dEnabled(live2dOn === "1");
       if (live2dH && Number(live2dH) <= 100) setLive2dHeight(Number(live2dH));
       if (live2dM) setLive2dModel(live2dM);
+      setLive2dShowHitAreas(live2dHa === "1");
       setLoading(false);
       // get magpie path (non-blocking)
       invoke<string>("get_magpie_exe_path").then(setMagpiePath).catch(() => {});
@@ -691,18 +695,28 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
                   </div>
                 </div>
 
-                {/* Reset position */}
+                {/* Show hit areas */}
                 <div className="flex items-center justify-between px-4 py-3 bg-surface-2">
                   <div>
-                    <p className="text-xs font-medium text-text-primary">重置位置</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">将角色移回右下角默认位置</p>
+                    <p className="text-xs font-medium text-text-primary">显示可互动区域</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">在模型上高亮显示可点击的部位</p>
                   </div>
                   <button
-                    onClick={() => localStorage.removeItem("live2d-pos")}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-3 hover:bg-surface-4 text-text-secondary rounded-lg transition-colors"
+                    onClick={() => {
+                      const v = !live2dShowHitAreas;
+                      setLive2dShowHitAreas(v);
+                      onLive2dShowHitAreasChange?.(v);
+                      db.setSetting("live2d_show_hitareas", v ? "1" : "0");
+                    }}
+                    className={`relative w-10 h-5 rounded-full overflow-hidden transition-all duration-200 shrink-0 ${
+                      live2dShowHitAreas ? "bg-accent" : "bg-surface-4"
+                    }`}
                   >
-                    <RotateCcw className="w-3 h-3" />
-                    重置
+                    <span
+                      className={`absolute top-0.5 left-0 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                        live2dShowHitAreas ? "translate-x-[22px]" : "translate-x-0.5"
+                      }`}
+                    />
                   </button>
                 </div>
               </div>
@@ -716,7 +730,7 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
                       key={m.id}
                       disabled={m.unsupported}
                       onClick={() => { if (!m.unsupported) { setLive2dModel(m.id); onLive2dModelChange?.(m.id); db.setSetting("live2d_model", m.id); } }}
-                      title={m.unsupported ? "Cubism 2 格式，暂不支持" : m.name}
+                      title={m.name}
                       className={`relative px-4 py-3 rounded-xl text-left transition-all border ${
                         m.unsupported
                           ? "opacity-40 cursor-not-allowed bg-surface-2 border-surface-3 text-text-muted"
@@ -740,6 +754,7 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
                   ))}
                 </div>
               </div>
+
             </div>
           )}
 

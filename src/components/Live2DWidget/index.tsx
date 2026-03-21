@@ -2,17 +2,12 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { Settings, HelpCircle } from "lucide-react";
 import { Bubble } from "./Bubble";
 import { MODEL_LIST, DEFAULT_MODEL_ID } from "./models";
-import {
-  systemMessages,
-  getIdleMessages,
-  getRandomFrom,
-} from "./messages";
 
 // 宽度匹配侧边栏 w-56 = 224px
 const SIDEBAR_W = 224;
-const IDLE_INTERVAL_MS = 28000;
 const CUBISM_CORE_CDN =
   "https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js";
+const CUBISM2_SDK_URL = "/live2d.min.js";
 
 // 圆形按钮弧形布局（以 canvas 坐标系为基准）
 const ARC_CENTER = { x: SIDEBAR_W / 2, y: 100 };
@@ -31,26 +26,28 @@ function arcPos(angleDeg: number) {
   };
 }
 
-function loadCubismCore(): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  if ((window as any).Live2DCubismCore) return Promise.resolve();
-  const existing = document.querySelector<HTMLScriptElement>(
-    `script[src="${CUBISM_CORE_CDN}"]`
-  );
+function loadScript(src: string, globalCheck: () => boolean): Promise<void> {
+  if (globalCheck()) return Promise.resolve();
+  const existing = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
   if (existing) {
     return new Promise((resolve, reject) => {
       existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("CDN failed")));
+      existing.addEventListener("error", () => reject(new Error(`Failed: ${src}`)));
     });
   }
   return new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = CUBISM_CORE_CDN;
+    script.src = src;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error("CDN failed"));
+    script.onerror = () => reject(new Error(`Failed: ${src}`));
     document.head.appendChild(script);
   });
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const loadCubismCore = () => loadScript(CUBISM_CORE_CDN, () => !!(window as any).Live2DCubismCore);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const loadCubism2SDK = () => loadScript(CUBISM2_SDK_URL, () => !!(window as any).Live2D);
 
 // 从 model JSON 中提取 hitArea → motionGroup 映射 和 motionGroup → motionEntries 映射
 interface MotionEntry {
@@ -75,20 +72,29 @@ function parseModelJson(modelData: Record<string, unknown>) {
 
   // hitArea name → motionGroup
   const hitAreaMap: Record<string, string> = {};
-  const hitAreas = (modelData.HitAreas as { Name: string; Motion?: string }[]) ?? [];
+  // 支持三种格式：Cubism 4 (HitAreas[])、Cubism 2 标准 (hit_areas[])、ViewerEX (hit_areas.$values[])
+  const hitAreasC4 = (modelData.HitAreas as { Name: string; Motion?: string }[]) ?? [];
+  const hitAreasRaw = modelData.hit_areas;
+  const hitAreasC2 = (
+    Array.isArray(hitAreasRaw)
+      ? (hitAreasRaw as Array<{ name: string }>)
+      : ((hitAreasRaw as { $values?: Array<{ name: string }> })?.$values ?? [])
+  ).map((a) => ({ Name: a.name }));
+  const hitAreas = hitAreasC4.length > 0 ? hitAreasC4 : hitAreasC2;
   const groupKeys = Object.keys(motionMap);
   for (const area of hitAreas) {
     const name = area.Name ?? "";
     let group = "";
-    if (area.Motion) {
-      // 格式可能是 "GroupName:MotionName" 或 "GroupName"
-      group = area.Motion.split(":")[0];
+    const motion = (area as { Name: string; Motion?: string }).Motion;
+    if (motion) {
+      group = motion.split(":")[0];
     } else {
-      // 按 "Tap" + name 或直接名称匹配
+      // 按 "Tap" + name 或 "tap_" + name 或直接名称匹配
       group =
         groupKeys.find(
           (g) =>
             g.toLowerCase() === `tap${name.toLowerCase()}` ||
+            g.toLowerCase() === `tap_${name.toLowerCase()}` ||
             g.toLowerCase() === name.toLowerCase()
         ) ?? "";
     }
@@ -98,16 +104,15 @@ function parseModelJson(modelData: Record<string, unknown>) {
   return { motionMap, hitAreaMap };
 }
 
-export type Live2DEvent =
-  | { type: "gameAdded"; key: number }
-  | { type: "gameCompleted"; key: number }
-  | null;
+function isCubism4Json(modelData: Record<string, unknown>): boolean {
+  return "FileReferences" in modelData;
+}
 
 interface Props {
   enabled: boolean;
   modelId?: string;
   visibleHeight?: number;
-  event?: Live2DEvent;
+  showHitAreas?: boolean;
   onSettings: () => void;
   onHelp: () => void;
 }
@@ -116,7 +121,7 @@ export function Live2DWidget({
   enabled,
   modelId = DEFAULT_MODEL_ID,
   visibleHeight = 200,
-  event,
+  showHitAreas = false,
   onSettings,
   onHelp,
 }: Props) {
@@ -124,6 +129,10 @@ export function Live2DWidget({
   const cleanupRef = useRef<(() => void) | null>(null);
   // 角色实际显示高度（px），用于百分比→像素换算
   const charDisplayHRef = useRef(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hitAreasGfxRef = useRef<any>(null);
+  const showHitAreasRef = useRef(showHitAreas);
+  showHitAreasRef.current = showHitAreas;
 
   const [visibleH, setVisibleH] = useState(0);
   const [modelReady, setModelReady] = useState(false);
@@ -148,7 +157,6 @@ export function Live2DWidget({
     }
 
     let destroyed = false;
-    let idleTimer: ReturnType<typeof setInterval> | null = null;
 
     const init = async () => {
       // 清除容器内可能残留的旧 canvas（异常退出时未清理的情况）
@@ -161,11 +169,31 @@ export function Live2DWidget({
       let app: any = null;
 
       try {
-        await loadCubismCore();
+        // 先加载 model JSON 以判断 Cubism 版本，再加载对应 SDK
+        let hitAreaMap: Record<string, string> = {};
+        let motionMap: Record<string, MotionEntry[]> = {};
+        let cubism4 = true;
+        try {
+          const modelData = await (await fetch(modelUrl)).json();
+          cubism4 = isCubism4Json(modelData);
+          ({ hitAreaMap, motionMap } = parseModelJson(modelData));
+        } catch { /* 解析失败则无交互文字 */ }
+
+        if (cubism4) {
+          await loadCubismCore();
+        } else {
+          await loadCubism2SDK();
+        }
         if (destroyed) return;
 
         const PIXI = await import("pixi.js");
-        const { Live2DModel } = await import("pixi-live2d-display/cubism4");
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let Live2DModel: any;
+        if (cubism4) {
+          ({ Live2DModel } = await import("pixi-live2d-display/cubism4"));
+        } else {
+          ({ Live2DModel } = await import("pixi-live2d-display/cubism2"));
+        }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         Live2DModel.registerTicker(PIXI.Ticker as any);
         if (destroyed) return;
@@ -185,14 +213,6 @@ export function Live2DWidget({
           resolution: window.devicePixelRatio || 1,
           autoDensity: true,
         });
-
-        // 预加载 model JSON，提取 hitArea/motion 映射
-        let hitAreaMap: Record<string, string> = {};
-        let motionMap: Record<string, MotionEntry[]> = {};
-        try {
-          const modelData = await (await fetch(modelUrl)).json();
-          ({ hitAreaMap, motionMap } = parseModelJson(modelData));
-        } catch { /* 解析失败则无交互文字 */ }
 
         const model = await Live2DModel.from(modelUrl, { autoInteract: false });
 
@@ -267,6 +287,50 @@ export function Live2DWidget({
         setVisibleH(Math.round(visibleHeight / 100 * charDisplayH));
         setModelReady(true);
 
+        // 扫描命中区域并构建可视化覆盖层
+        const STEP = 8;
+        const PALETTE = [0xf87171, 0x60a5fa, 0xa78bfa, 0x34d399, 0xfbbf24, 0xf472b6];
+        const areaColors: Record<string, number> = {};
+        let palIdx = 0;
+        const cells: { x: number; y: number; color: number }[] = [];
+        const centroids: Record<string, { sx: number; sy: number; n: number }> = {};
+
+        for (let px = STEP / 2; px < SIDEBAR_W; px += STEP) {
+          for (let py = STEP / 2; py < modelH; py += STEP) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const hits: string[] = (model as any).hitTest(px, py);
+            if (!hits.length) continue;
+            const name = hits[0];
+            if (!areaColors[name]) areaColors[name] = PALETTE[palIdx++ % PALETTE.length];
+            cells.push({ x: px - STEP / 2, y: py - STEP / 2, color: areaColors[name] });
+            if (!centroids[name]) centroids[name] = { sx: 0, sy: 0, n: 0 };
+            centroids[name].sx += px;
+            centroids[name].sy += py;
+            centroids[name].n++;
+          }
+        }
+
+        const gfx = new PIXI.Graphics();
+        for (const { x, y, color } of cells) {
+          gfx.beginFill(color, 0.35);
+          gfx.drawRect(x, y, STEP, STEP);
+          gfx.endFill();
+        }
+        for (const [name, { sx, sy, n }] of Object.entries(centroids)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const label = new (PIXI as any).Text(name, {
+            fontSize: 12, fill: 0xffffff, fontWeight: "bold",
+            stroke: 0x000000, strokeThickness: 3,
+          });
+          label.x = sx / n - label.width / 2;
+          label.y = sy / n - label.height / 2;
+          gfx.addChild(label);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        app.stage.addChild(gfx as any);
+        gfx.visible = showHitAreasRef.current;
+        hitAreasGfxRef.current = gfx;
+
         model.interactive = true;
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -296,14 +360,8 @@ export function Live2DWidget({
           }
         });
 
-        showBubble(getRandomFrom(systemMessages.startup), 6000);
-
-        idleTimer = setInterval(() => {
-          showBubble(getRandomFrom(getIdleMessages()));
-        }, IDLE_INTERVAL_MS);
-
         cleanupRef.current = () => {
-          if (idleTimer) clearInterval(idleTimer);
+          hitAreasGfxRef.current = null;
           model.destroy();
           app.destroy(true);
         };
@@ -336,11 +394,13 @@ export function Live2DWidget({
     }
   }, [visibleHeight, modelReady]);
 
+  // 实时切换命中区域可视化
   useEffect(() => {
-    if (!event) return;
-    const msgs = systemMessages[event.type] ?? [];
-    if (msgs.length) showBubble(getRandomFrom(msgs), 6000);
-  }, [event, showBubble]);
+    if (hitAreasGfxRef.current) {
+      hitAreasGfxRef.current.visible = showHitAreas;
+    }
+  }, [showHitAreas]);
+
 
   if (!enabled) return null;
 

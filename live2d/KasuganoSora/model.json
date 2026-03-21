@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "model": "model_0.moc",
+  "textures": ["textures_$values_0_0.png"],
+  "physics": "physics_0.json",
+  "hit_areas": [
+    { "name": "head",  "id": "D_REF.HEAD"  },
+    { "name": "body",  "id": "D_REF.BODY"  },
+    { "name": "skirt", "id": "D_REF.SKIRT" }
+  ],
+  "motions": {
+    "tap_head": [
+      {
+        "file": "motions_tap_head_$values_0_file_0",
+        "sound": "motions_tap_head_$values_0_sound_0.mp3"
+      }
+    ],
+    "tap_body": [
+      {
+        "file": "motions_tap_body_$values_0_file_0",
+        "sound": "motions_tap_body_$values_0_sound_0.mp3"
+      }
+    ],
+    "tap_skirt": [
+      {
+        "file": "motions_tap_skirt_$values_0_file_0",
+        "sound": "motions_tap_skirt_$values_0_sound_0.mp3"
+      }
+    ],
+    "idle": [
+      {
+        "file": "motions_idle_$values_0_file_0"
+      }
+    ]
+  },
+  "expressions": [
+    { "name": "f01", "file": "expressions_$values_0_file_0.json" }
+  ]
+}
