@@ -635,89 +635,109 @@ export function SettingsDialog({ onClose, initialTab, onLive2dChange, onLive2dHe
             </div>
           )}
           {tab === "live2d" && (
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs font-medium text-text-secondary mb-1">看板娘</p>
-                <p className="text-[10px] text-text-muted mb-4">丛雨会出现在界面右下角，点击她可触发互动。</p>
-
-                {/* Enable toggle */}
-                <div className="flex items-center justify-between py-3 border-b border-surface-3">
-                  <div>
-                    <p className="text-xs font-medium text-text-primary">显示看板娘</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">开启后丛雨将守护你的游戏库</p>
+            <div className="space-y-4">
+              {/* Header banner */}
+              <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-accent/15 via-accent/8 to-transparent border border-accent/20 px-4 py-4">
+                <div className="absolute -top-5 -right-5 w-24 h-24 rounded-full bg-accent/10 blur-2xl pointer-events-none" />
+                <div className="absolute -bottom-3 -left-3 w-16 h-16 rounded-full bg-accent/8 blur-xl pointer-events-none" />
+                <div className="relative flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-accent/20 border border-accent/20 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5 text-accent" />
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-text-primary">看板娘</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">可爱的角色陪伴你管理游戏库，点击触发互动</p>
+                  </div>
+                  {/* Enable toggle */}
                   <button
-                    onClick={() => { const v = !live2dEnabled; setLive2dEnabled(v); onLive2dChange?.(v); }}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                    onClick={() => { const v = !live2dEnabled; setLive2dEnabled(v); onLive2dChange?.(v); db.setSetting("live2d_enabled", v ? "1" : "0"); }}
+                    className={`relative w-10 h-5 rounded-full overflow-hidden transition-all duration-200 shrink-0 ${
                       live2dEnabled ? "bg-accent" : "bg-surface-4"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                        live2dEnabled ? "translate-x-5" : "translate-x-0.5"
+                      className={`absolute top-0.5 left-0 w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-200 ${
+                        live2dEnabled ? "translate-x-[22px]" : "translate-x-0.5"
                       }`}
                     />
                   </button>
                 </div>
+              </div>
 
+              {/* Settings group */}
+              <div className="rounded-xl border border-surface-3 overflow-hidden divide-y divide-surface-3">
                 {/* Height slider */}
-                <div className="flex items-center justify-between py-3 border-b border-surface-3">
+                <div className="flex items-center justify-between px-4 py-3 bg-surface-2">
                   <div>
                     <p className="text-xs font-medium text-text-primary">显示高度</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">当前 {live2dHeight}%</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">调整角色在屏幕上的显示高度</p>
                   </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    step={5}
-                    value={live2dHeight}
-                    onChange={(e) => {
-                      const v = Number(e.target.value);
-                      setLive2dHeight(v);
-                      onLive2dHeightChange?.(v);
-                    }}
-                    className="w-28 accent-accent"
-                  />
-                </div>
-
-                {/* Model selector */}
-                <div className="py-3 border-b border-surface-3">
-                  <p className="text-xs font-medium text-text-primary mb-2">选择角色</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {MODEL_LIST.map((m) => (
-                      <button
-                        key={m.id}
-                        disabled={m.unsupported}
-                        onClick={() => { if (!m.unsupported) { setLive2dModel(m.id); onLive2dModelChange?.(m.id); } }}
-                        title={m.unsupported ? "Cubism 2 格式，暂不支持" : m.name}
-                        className={`px-3 py-2 rounded-lg text-xs text-left transition-colors border ${
-                          m.unsupported
-                            ? "opacity-40 cursor-not-allowed bg-surface-2 border-transparent text-text-muted"
-                            : live2dModel === m.id
-                              ? "bg-accent/15 border-accent/40 text-accent font-medium"
-                              : "bg-surface-2 border-transparent text-text-secondary hover:bg-surface-3"
-                        }`}
-                      >
-                        {m.name}
-                        {m.unsupported && <span className="block text-[9px] text-text-muted/60">不支持</span>}
-                      </button>
-                    ))}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-text-muted tabular-nums w-8 text-right">{live2dHeight}%</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={live2dHeight}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        setLive2dHeight(v);
+                        onLive2dHeightChange?.(v);
+                        db.setSetting("live2d_height", String(v));
+                      }}
+                      className="w-24 accent-accent"
+                    />
                   </div>
                 </div>
 
                 {/* Reset position */}
-                <div className="flex items-center justify-between py-3">
+                <div className="flex items-center justify-between px-4 py-3 bg-surface-2">
                   <div>
                     <p className="text-xs font-medium text-text-primary">重置位置</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">将丛雨移回右下角默认位置</p>
+                    <p className="text-[10px] text-text-muted mt-0.5">将角色移回右下角默认位置</p>
                   </div>
                   <button
                     onClick={() => localStorage.removeItem("live2d-pos")}
-                    className="px-3 py-1.5 text-xs bg-surface-2 hover:bg-surface-3 text-text-secondary rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-surface-3 hover:bg-surface-4 text-text-secondary rounded-lg transition-colors"
                   >
+                    <RotateCcw className="w-3 h-3" />
                     重置
                   </button>
+                </div>
+              </div>
+
+              {/* Model selector */}
+              <div>
+                <p className="text-xs font-medium text-text-secondary mb-2 px-0.5">选择角色</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {MODEL_LIST.map((m) => (
+                    <button
+                      key={m.id}
+                      disabled={m.unsupported}
+                      onClick={() => { if (!m.unsupported) { setLive2dModel(m.id); onLive2dModelChange?.(m.id); db.setSetting("live2d_model", m.id); } }}
+                      title={m.unsupported ? "Cubism 2 格式，暂不支持" : m.name}
+                      className={`relative px-4 py-3 rounded-xl text-left transition-all border ${
+                        m.unsupported
+                          ? "opacity-40 cursor-not-allowed bg-surface-2 border-surface-3 text-text-muted"
+                          : live2dModel === m.id
+                            ? "bg-accent/12 border-accent/40 shadow-sm"
+                            : "bg-surface-2 border-surface-3 text-text-secondary hover:bg-surface-3 hover:border-surface-4"
+                      }`}
+                    >
+                      {live2dModel === m.id && !m.unsupported && (
+                        <span className="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-accent flex items-center justify-center">
+                          <Check className="w-2.5 h-2.5 text-white" />
+                        </span>
+                      )}
+                      <p className={`text-xs font-medium ${!m.unsupported && live2dModel === m.id ? "text-accent" : "text-text-primary"}`}>
+                        {m.name}
+                      </p>
+                      <p className="text-[10px] text-text-muted mt-0.5">
+                        {m.unsupported ? "暂不支持" : m.id}
+                      </p>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
