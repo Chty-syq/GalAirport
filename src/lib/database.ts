@@ -269,6 +269,15 @@ export async function addPlaySession(
   );
 }
 
+export async function getMonthlyPlaytime(): Promise<{ month: string; seconds: number }[]> {
+  const d = await getDb();
+  const rows = await d.select<{ month: string; seconds: number }[]>(
+    `SELECT strftime('%Y-%m', start_time) as month, SUM(duration) as seconds
+     FROM play_sessions GROUP BY month ORDER BY month DESC LIMIT 12`
+  );
+  return rows;
+}
+
 // ─── Settings ───────────────────────────────────────────────
 
 export async function getSetting(key: string): Promise<string> {

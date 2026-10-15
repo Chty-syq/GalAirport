@@ -460,7 +460,13 @@ async fn check_update(
         .map_err(|e| format!("请求失败: {}", e))?;
 
     if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status().as_u16()));
+        let status = resp.status().as_u16();
+        let body: serde_json::Value = resp.json().await.unwrap_or_default();
+        let msg = body["message"].as_str().unwrap_or("");
+        if status == 403 && msg.contains("rate limit") {
+            return Err("GitHub API 请求次数已达上限（60次/小时），请稍后再试".to_string());
+        }
+        return Err(format!("HTTP {}: {}", status, if msg.is_empty() { "请求失败" } else { msg }));
     }
 
     let json: serde_json::Value = resp
@@ -528,7 +534,8 @@ async fn download_update(
         .map_err(|e| format!("下载请求失败: {}", e))?;
 
     if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status().as_u16()));
+        let status = resp.status().as_u16();
+        return Err(format!("下载失败: HTTP {}", status));
     }
 
     let total = resp.content_length().unwrap_or(0);

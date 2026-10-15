@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Settings, HelpCircle, Sparkles } from "lucide-react";
+import { Settings, HelpCircle, Sparkles, BarChart2 } from "lucide-react";
 import { Bubble } from "./Bubble";
 import { MODEL_LIST, DEFAULT_MODEL_ID } from "./models";
 
@@ -12,6 +12,7 @@ const CUBISM2_SDK_URL = "/live2d.min.js";
 const BTN_SIZE = 34;
 const BTNS = [
   { key: "fortune",  title: "今日运势" },
+  { key: "stats",    title: "数据看板" },
   { key: "settings", title: "设置" },
   { key: "help",     title: "帮助" },
 ];
@@ -106,6 +107,7 @@ interface Props {
   onSettings: () => void;
   onHelp: () => void;
   onFortune: () => void;
+  onStats: () => void;
 }
 
 export function Live2DWidget({
@@ -116,6 +118,7 @@ export function Live2DWidget({
   onSettings,
   onHelp,
   onFortune,
+  onStats,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -440,11 +443,13 @@ export function Live2DWidget({
         style={{ left: SIDEBAR_W - BTN_SIZE - 8 }}
       >
         {BTNS.map(({ key, title }, i) => {
-          const onClick = key === "settings" ? onSettings : key === "help" ? onHelp : onFortune;
+          const onClick = key === "settings" ? onSettings : key === "help" ? onHelp : key === "stats" ? onStats : onFortune;
           const icon = key === "settings"
             ? <Settings className="w-4 h-4" />
             : key === "help"
             ? <HelpCircle className="w-4 h-4" />
+            : key === "stats"
+            ? <BarChart2 className="w-4 h-4" />
             : <Sparkles className="w-4 h-4" />;
           return (
             <button

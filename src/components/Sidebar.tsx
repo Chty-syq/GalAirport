@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Tag, X, Settings, FolderOpen, HelpCircle, Layers, Upload } from "lucide-react";
+import { Tag, X, Settings, FolderOpen, HelpCircle, Layers, Upload, BarChart2 } from "lucide-react";
 import type { Collection, PlayStatus } from "@/types/game";
 import { cn } from "@/lib/utils";
 import * as db from "@/lib/database";
@@ -24,6 +24,7 @@ interface Props {
   allGames: { collection_id: string | null }[];
   onSettings: () => void;
   onHelp: () => void;
+  onStats: () => void;
   live2dEnabled: boolean;
 }
 
@@ -49,6 +50,7 @@ export function Sidebar({
   allGames,
   onSettings,
   onHelp,
+  onStats,
   live2dEnabled,
 }: Props) {
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -278,6 +280,13 @@ export function Sidebar({
       {/* 底部操作：live2d 启用时由 widget 侧圆形按钮替代 */}
       {!live2dEnabled && (
         <div className="px-3 py-3 border-t border-surface-3/60 space-y-0.5">
+          <button
+            onClick={onStats}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            数据看板
+          </button>
           <button
             onClick={onSettings}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-surface-2 hover:text-text-primary transition-colors"

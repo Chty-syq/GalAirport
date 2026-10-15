@@ -20,6 +20,7 @@ import { CollectionManagerDialog } from "@/components/CollectionDialog";
 import { HelpDialog } from "@/components/HelpDialog";
 import { WalkthroughDialog } from "@/components/WalkthroughDialog";
 import { FortuneDialog } from "@/components/FortuneDialog";
+import { StatsDialog } from "@/components/StatsDialog";
 import { Live2DWidget } from "@/components/Live2DWidget";
 
 function App() {
@@ -37,6 +38,7 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showFortune, setShowFortune] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [showCollectionDialog, setShowCollectionDialog] = useState(false);
   const [runningGameId, setRunningGameId] = useState<string | null>(null);
   const [walkthroughGame, setWalkthroughGame] = useState<Game | null>(null);
@@ -193,6 +195,7 @@ function App() {
         allGames={library.allGames}
         onSettings={() => setShowSettings(true)}
         onHelp={() => setShowHelp(true)}
+        onStats={() => setShowStats(true)}
         live2dEnabled={live2dEnabled}
       />
 
@@ -402,6 +405,13 @@ function App() {
         <HelpDialog onClose={() => setShowHelp(false)} />
       )}
 
+      {showStats && (
+        <StatsDialog
+          games={library.allGames}
+          onClose={() => setShowStats(false)}
+        />
+      )}
+
       {showFortune && (
         <FortuneDialog
           games={library.games}
@@ -458,6 +468,7 @@ function App() {
         onSettings={() => setShowSettings(true)}
         onHelp={() => setShowHelp(true)}
         onFortune={() => setShowFortune(true)}
+        onStats={() => setShowStats(true)}
       />
 
       {/* Delete confirmation */}
